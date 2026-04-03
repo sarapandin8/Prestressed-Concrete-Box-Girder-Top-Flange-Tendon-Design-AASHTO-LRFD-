@@ -65,14 +65,14 @@ df_tendon = st.sidebar.data_editor(
     key="tendon_editor"
 )
 
-# Material / Prestress
+# Material
 st.sidebar.subheader("Material & Prestress")
 
 fc = st.sidebar.number_input("f'c (MPa)", value=40.0)
 eff = st.sidebar.slider("Effective Prestress Ratio", 0.5, 0.9, 0.75)
 
-aps = 140e-6     # m²
-fpu = 1860       # MPa
+aps = 140e-6   # m²
+fpu = 1860     # MPa
 
 # Loads
 st.sidebar.subheader("Loads")
@@ -107,7 +107,7 @@ df_tdn = clean_df(df_tendon)
 df_ld = clean_df(df_load)
 
 # ==============================
-# SECTION + TENDON VIEW
+# SECTION VIEW
 # ==============================
 st.subheader("🔍 Section + Tendon")
 
@@ -174,7 +174,7 @@ else:
     st.warning("Need load data")
 
 # ==============================
-# STRESS (SERVICE I)
+# STRESS CHECK
 # ==============================
 st.subheader("🧮 Stress Check (Service I)")
 
@@ -182,8 +182,8 @@ if len(df_thk) >= 2 and len(df_tdn) >= 2 and len(df_ld) >= 2:
 
     total_strands = num_tendon * strands_per_tendon
 
-    # Prestress force (kN)
-    P = total_strands * aps * fpu * eff * 1000
+    # 🔴 Prestress = Compression (NEGATIVE)
+    P = - total_strands * aps * fpu * eff * 1000
 
     x_plot = np.linspace(0, width, 400)
 
@@ -213,47 +213,33 @@ if len(df_thk) >= 2 and len(df_tdn) >= 2 and len(df_ld) >= 2:
     fig3.add_trace(go.Scatter(
         x=x_plot,
         y=sigma_top,
-        name="Top Fiber (MPa)",
-        line=dict(color="red"),
-        hovertemplate="x = %{x:.2f} m<br>σ = %{y:.2f} MPa"
+        name="Top Fiber",
+        line=dict(color="red")
     ))
 
     fig3.add_trace(go.Scatter(
         x=x_plot,
         y=sigma_bot,
-        name="Bottom Fiber (MPa)",
-        line=dict(color="blue"),
-        hovertemplate="x = %{x:.2f} m<br>σ = %{y:.2f} MPa"
+        name="Bottom Fiber",
+        line=dict(color="blue")
     ))
 
     fig3.add_hline(
         y=0,
         line_dash="dash",
-        line_color="black",
-        annotation_text="0 MPa (Tension + / Compression -)",
-        annotation_position="top left"
+        annotation_text="+ Tension / - Compression"
     )
 
     fig3.update_layout(
-        title="Service I Stress (+ Tension / - Compression)",
+        title="Stress Distribution (Service I)",
         xaxis_title="x (m)",
         yaxis_title="Stress (MPa)"
     )
 
     st.plotly_chart(fig3, use_container_width=True)
 
-    st.write(f"Total Tendons = {num_tendon}")
-    st.write(f"Strands / Tendon = {strands_per_tendon}")
     st.write(f"Total Strands = {total_strands}")
-    st.write(f"Prestress Force P = {P:.2f} kN")
+    st.write(f"Prestress Force P = {P:.2f} kN (Compression)")
 
 else:
     st.warning("Need full data for stress calculation")
-
-# ==============================
-# DEBUG
-# ==============================
-if st.checkbox("Show Debug Data"):
-    st.write("Section:", df_thk)
-    st.write("Tendon:", df_tdn)
-    st.write("Load:", df_ld)
