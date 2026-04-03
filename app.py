@@ -47,23 +47,60 @@ with tab2:
 # TAB 3: LOADS
 # ==============================
 with tab3:
-    st.header("Applied Loads (per 1m strip)")
+    st.header("Applied Loads (per 1m strip) — Variable along width")
 
-    M_DL = st.number_input("M_DL (kN·m/m)", value=500.0)
-    V_DL = st.number_input("V_DL (kN/m)", value=200.0)
+    st.write("Input M and V along transverse direction (x)")
 
-    M_SDL = st.number_input("M_SDL (kN·m/m)", value=200.0)
-    V_SDL = st.number_input("V_SDL (kN/m)", value=100.0)
+    df_load = st.data_editor(
+        pd.DataFrame({
+            "x (m)": [0.0, width],
+            "M_DL": [500.0, 500.0],
+            "V_DL": [200.0, 200.0],
+            "M_SDL": [200.0, 200.0],
+            "V_SDL": [100.0, 100.0],
+            "M_LL": [800.0, 800.0],
+            "V_LL": [300.0, 300.0],
+        }),
+        num_rows="dynamic"
+    )
 
-    M_LL = st.number_input("M_LL (kN·m/m)", value=800.0)
-    V_LL = st.number_input("V_LL (kN/m)", value=300.0)
+    if len(df_load) >= 2:
 
-    # Load combinations
-    Mu = 1.25*M_DL + 1.5*M_SDL + 1.75*M_LL
-    Vu = 1.25*V_DL + 1.5*V_SDL + 1.75*V_LL
+        x_plot = np.linspace(0, width, 100)
 
-    st.write(f"**Mu (Strength I)** = {Mu:.2f} kN·m/m")
-    st.write(f"**Vu (Strength I)** = {Vu:.2f} kN/m")
+        # Interpolation
+        M_DL_i = np.interp(x_plot, df_load["x (m)"], df_load["M_DL"])
+        V_DL_i = np.interp(x_plot, df_load["x (m)"], df_load["V_DL"])
+
+        M_SDL_i = np.interp(x_plot, df_load["x (m)"], df_load["M_SDL"])
+        V_SDL_i = np.interp(x_plot, df_load["x (m)"], df_load["V_SDL"])
+
+        M_LL_i = np.interp(x_plot, df_load["x (m)"], df_load["M_LL"])
+        V_LL_i = np.interp(x_plot, df_load["x (m)"], df_load["V_LL"])
+
+        # Strength I Combination
+        Mu = 1.25*M_DL_i + 1.50*M_SDL_i + 1.75*M_LL_i
+        Vu = 1.25*V_DL_i + 1.50*V_SDL_i + 1.75*V_LL_i
+
+        st.subheader("Load Combination — Strength I (AASHTO LRFD)")
+
+        st.write("Mu = 1.25·M_DL + 1.50·M_SDL + 1.75·M_LL")
+        st.write("Vu = 1.25·V_DL + 1.50·V_SDL + 1.75·V_LL")
+
+        st.write("Reference: AASHTO LRFD Table 3.4.1-1")
+
+        # Plot
+        fig_load = go.Figure()
+
+        fig_load.add_trace(go.Scatter(x=x_plot, y=Mu, name="Mu (kN·m/m)"))
+        fig_load.add_trace(go.Scatter(x=x_plot, y=Vu, name="Vu (kN/m)"))
+
+        fig_load.update_layout(title="Strength I — Load Distribution")
+
+        st.plotly_chart(fig_load, use_container_width=True)
+
+    else:
+        st.warning("Please input at least two points.")
 
 # ==============================
 # TAB 4: VISUALIZATION
