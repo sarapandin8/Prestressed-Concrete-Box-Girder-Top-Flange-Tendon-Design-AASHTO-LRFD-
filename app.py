@@ -8,7 +8,7 @@ st.set_page_config(layout="wide")
 st.title("Prestressed Concrete Box Girder — Top Flange Tendon Design (Phase 1)")
 
 # ==============================
-# SESSION INIT
+# INIT SESSION
 # ==============================
 def init_df(name, df):
     if name not in st.session_state:
@@ -28,7 +28,7 @@ with tab1:
     width = st.number_input("Top Flange Width (m)", value=3.0)
     web_thickness = st.number_input("Web Thickness (m)", value=0.5)
 
-    # -------- Thickness Table --------
+    # -------- Thickness --------
     init_df("df_thickness", pd.DataFrame({
         "Delete": [False, False],
         "x (m)": [0.0, width],
@@ -45,7 +45,7 @@ with tab1:
     df_thickness = df_thickness[df_thickness["Delete"] == False]
     st.session_state.df_thickness = df_thickness
 
-    # -------- Tendon Table (Preview ใช้ร่วม) --------
+    # -------- Tendon (Preview) --------
     init_df("df_tendon", pd.DataFrame({
         "Delete": [False, False],
         "x (m)": [0.0, width],
@@ -67,16 +67,16 @@ with tab1:
 
     if len(df_thickness) >= 2 and len(df_tendon) >= 2:
 
-        x = np.linspace(0, width, 100)
+        x = np.linspace(0, width, 200)
 
-        # --- Thickness ---
-        df_thk = df_thickness.drop(columns=["Delete"], errors="ignore").dropna()
+        # ===== CLEAN THICKNESS =====
+        df_thk = df_thickness.drop(columns=["Delete"], errors="ignore")
         df_thk["x (m)"] = pd.to_numeric(df_thk["x (m)"], errors='coerce')
         df_thk["t (m)"] = pd.to_numeric(df_thk["t (m)"], errors='coerce')
         df_thk = df_thk.dropna().sort_values("x (m)")
 
-        # --- Tendon ---
-        df_tdn = df_tendon.drop(columns=["Delete"], errors="ignore").dropna()
+        # ===== CLEAN TENDON =====
+        df_tdn = df_tendon.drop(columns=["Delete"], errors="ignore")
         df_tdn["x (m)"] = pd.to_numeric(df_tdn["x (m)"], errors='coerce')
         df_tdn["z from top (m)"] = pd.to_numeric(df_tdn["z from top (m)"], errors='coerce')
         df_tdn = df_tdn.dropna().sort_values("x (m)")
@@ -88,40 +88,32 @@ with tab1:
 
             fig = go.Figure()
 
-            # Top
             fig.add_trace(go.Scatter(x=x, y=np.zeros_like(x), name="Top Surface"))
-
-            # Bottom
             fig.add_trace(go.Scatter(x=x, y=-t_interp, name="Bottom Surface"))
 
-            # Tendon
             fig.add_trace(go.Scatter(
                 x=x,
                 y=-z_interp,
                 mode='lines',
-                name="Tendon Profile",
+                name="Tendon",
                 line=dict(width=3)
             ))
 
-            # Webs
             fig.add_vline(x=web_thickness/2)
             fig.add_vline(x=width - web_thickness/2)
 
-            fig.update_layout(
-                title="Section + Tendon",
-                yaxis_title="Depth (m)"
-            )
+            fig.update_layout(title="Section + Tendon", yaxis_title="Depth (m)")
 
             st.plotly_chart(fig, use_container_width=True)
 
         else:
-            st.warning("Need valid numeric input")
+            st.warning("Invalid numeric input")
 
     else:
         st.info("Enter at least 2 points")
 
 # ==============================
-# TAB 2: TENDON (MAIN)
+# TAB 2: TENDON INFO
 # ==============================
 with tab2:
     st.header("Tendon Design Input")
@@ -129,9 +121,8 @@ with tab2:
     strands = st.number_input("Number of Strands", value=8)
     spacing = st.number_input("Spacing (m)", value=0.3)
 
-    df_tendon = st.session_state.df_tendon
-
-    st.write(df_tendon)
+    st.write("Current Tendon Table:")
+    st.write(st.session_state.df_tendon)
 
 # ==============================
 # TAB 3: LOADS
@@ -161,24 +152,49 @@ with tab3:
 
     if len(df_load) >= 2:
 
-        df = df_load.drop(columns=["Delete"]).dropna()
-        df = df.sort_values("x (m)")
+        df = df_load.drop(columns=["Delete"])
+        df["x (m)"] = pd.to_numeric(df["x (m)"], errors='coerce')
 
-        x_plot = np.linspace(0, width, 100)
+        for col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
 
-        Mu = 1.25*np.interp(x_plot, df["x (m)"], df["M_DL"]) + \
-             1.50*np.interp(x_plot, df["x (m)"], df["M_SDL"]) + \
-             1.75*np.interp(x_plot, df["x (m)"], df["M_LL"])
+        df = df.dropna().sort_values("x (m)")
 
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=x_plot, y=Mu, name="Mu"))
+        if len(df) >= 2:
 
-        st.plotly_chart(fig)
+            x_plot = np.linspace(0, width, 200)
+
+            Mu = (
+                1.25*np.interp(x_plot, df["x (m)"], df["M_DL"]) +
+                1.50*np.interp(x_plot, df["x (m)"], df["M_SDL"]) +
+                1.75*np.interp(x_plot, df["x (m)"], df["M_LL"])
+            )
+
+            Vu = (
+                1.25*np.interp(x_plot, df["x (m)"], df["V_DL"]) +
+                1.50*np.interp(x_plot, df["x (m)"], df["V_SDL"]) +
+                1.75*np.interp(x_plot, df["x (m)"], df["V_LL"])
+            )
+
+            st.subheader("Strength I (AASHTO LRFD)")
+            st.write("Mu = 1.25 DL + 1.50 SDL + 1.75 LL")
+            st.write("Vu = 1.25 DL + 1.50 SDL + 1.75 LL")
+
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=x_plot, y=Mu, name="Mu"))
+            fig.add_trace(go.Scatter(x=x_plot, y=Vu, name="Vu"))
+
+            st.plotly_chart(fig, use_container_width=True)
+
+        else:
+            st.error("Need valid numeric data")
+
+    else:
+        st.warning("Need at least 2 points")
 
 # ==============================
 # TAB 4: VISUALIZATION
 # ==============================
 with tab4:
     st.header("Advanced Visualization")
-
-    st.info("Use Section Tab for real-time preview")
+    st.info("Use Section tab for real-time preview")
