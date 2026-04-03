@@ -174,7 +174,7 @@ else:
     st.warning("Need load data")
 
 # ==============================
-# PHASE 2: STRESS
+# STRESS (SERVICE I)
 # ==============================
 st.subheader("🧮 Stress Check (Service I)")
 
@@ -209,11 +209,33 @@ if len(df_thk) >= 2 and len(df_tdn) >= 2 and len(df_ld) >= 2:
     sigma_bot = ((P / A) - (P * e * y_bot / I) - (M * y_bot / I)) / 1000
 
     fig3 = go.Figure()
-    fig3.add_trace(go.Scatter(x=x_plot, y=sigma_top, name="Top Stress (MPa)"))
-    fig3.add_trace(go.Scatter(x=x_plot, y=sigma_bot, name="Bottom Stress (MPa)"))
+
+    fig3.add_trace(go.Scatter(
+        x=x_plot,
+        y=sigma_top,
+        name="Top Fiber (MPa)",
+        line=dict(color="red"),
+        hovertemplate="x = %{x:.2f} m<br>σ = %{y:.2f} MPa"
+    ))
+
+    fig3.add_trace(go.Scatter(
+        x=x_plot,
+        y=sigma_bot,
+        name="Bottom Fiber (MPa)",
+        line=dict(color="blue"),
+        hovertemplate="x = %{x:.2f} m<br>σ = %{y:.2f} MPa"
+    ))
+
+    fig3.add_hline(
+        y=0,
+        line_dash="dash",
+        line_color="black",
+        annotation_text="0 MPa (Tension + / Compression -)",
+        annotation_position="top left"
+    )
 
     fig3.update_layout(
-        title="Service I Stress",
+        title="Service I Stress (+ Tension / - Compression)",
         xaxis_title="x (m)",
         yaxis_title="Stress (MPa)"
     )
