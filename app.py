@@ -42,13 +42,14 @@ if "df_load" not in st.session_state:
 tab1, tab2 = st.tabs(["Section + Tendon", "Loads"])
 
 # ==============================
-# TAB 1
+# TAB 1: SECTION + TENDON
 # ==============================
 with tab1:
     st.header("Section + Tendon")
 
     col1, col2 = st.columns(2)
 
+    # -------- SECTION --------
     with col1:
         width = st.number_input("Width (m)", value=6.0)
         web_thickness = st.number_input("Web Thickness (m)", value=0.5)
@@ -59,7 +60,6 @@ with tab1:
             key="thickness_editor"
         )
 
-        # ---- CLEAN THICKNESS ----
         df_thk = df_thickness.copy()
         df_thk["Delete"] = df_thk["Delete"].fillna(False)
         df_thk = df_thk[df_thk["Delete"] == False]
@@ -71,6 +71,7 @@ with tab1:
         df_thk = df_thk.drop_duplicates(subset="x (m)")
         df_thk = df_thk.sort_values("x (m)")
 
+    # -------- TENDON --------
     with col2:
         df_tendon = st.data_editor(
             st.session_state.df_tendon,
@@ -78,7 +79,6 @@ with tab1:
             key="tendon_editor"
         )
 
-        # ---- CLEAN TENDON ----
         df_tdn = df_tendon.copy()
         df_tdn["Delete"] = df_tdn["Delete"].fillna(False)
         df_tdn = df_tdn[df_tdn["Delete"] == False]
@@ -90,16 +90,22 @@ with tab1:
         df_tdn = df_tdn.drop_duplicates(subset="x (m)")
         df_tdn = df_tdn.sort_values("x (m)")
 
-    # ---- PREVIEW ----
+    # -------- PREVIEW --------
     st.subheader("Preview")
 
     if len(df_thk) >= 2 and len(df_tdn) >= 2:
 
         x_plot = np.linspace(0, width, 400)
 
-        # Interpolate with pandas
-        df_sec = df_thk.set_index("x (m)").reindex(x_plot).interpolate()
-        df_ten = df_tdn.set_index("x (m)").reindex(x_plot).interpolate()
+        # ----- SECTION INTERPOLATION -----
+        df_sec = df_thk.set_index("x (m)")
+        df_sec = df_sec.select_dtypes(include=[np.number]).astype(float)
+        df_sec = df_sec.reindex(x_plot).interpolate()
+
+        # ----- TENDON INTERPOLATION -----
+        df_ten = df_tdn.set_index("x (m)")
+        df_ten = df_ten.select_dtypes(include=[np.number]).astype(float)
+        df_ten = df_ten.reindex(x_plot).interpolate()
 
         t_interp = df_sec["t (m)"]
         z_interp = df_ten["z from top (m)"]
@@ -119,6 +125,11 @@ with tab1:
         fig.add_vline(x=web_thickness/2)
         fig.add_vline(x=width - web_thickness/2)
 
+        fig.update_layout(
+            title="Section + Tendon",
+            yaxis_title="Depth (m)"
+        )
+
         st.plotly_chart(fig, use_container_width=True)
 
     else:
@@ -136,7 +147,6 @@ with tab2:
         key="load_editor"
     )
 
-    # ---- CLEAN LOAD ----
     df_ld = df_load.copy()
     df_ld["Delete"] = df_ld["Delete"].fillna(False)
     df_ld = df_ld[df_ld["Delete"] == False]
@@ -148,22 +158,27 @@ with tab2:
     df_ld = df_ld.drop_duplicates(subset="x (m)")
     df_ld = df_ld.sort_values("x (m)")
 
-    st.write("Clean Data:", df_ld)
+    st.write("Clean Load Data:", df_ld)
 
     if len(df_ld) >= 2:
 
         x_plot = np.linspace(0, width, 400)
 
-        df_interp = df_ld.set_index("x (m)").reindex(x_plot).interpolate()
+        df_interp = df_ld.set_index("x (m)")
+        df_interp = df_interp.select_dtypes(include=[np.number]).astype(float)
+        df_interp = df_interp.reindex(x_plot).interpolate()
 
         Mu = 1.25*df_interp["M_DL"] + 1.5*df_interp["M_SDL"] + 1.75*df_interp["M_LL"]
         Vu = 1.25*df_interp["V_DL"] + 1.5*df_interp["V_SDL"] + 1.75*df_interp["V_LL"]
 
+        st.subheader("Strength I (AASHTO LRFD)")
+        st.write("Mu = 1.25 DL + 1.50 SDL + 1.75 LL")
+
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=x_plot, y=Mu, name="Mu"))
-        fig.add_trace(go.Scatter(x=x_plot, y=Vu, name="Vu"))
+        fig.add_trace(go.Scatter(x=x_plot, y=Mu, name="Mu (kN·m/m)"))
+        fig.add_trace(go.Scatter(x=x_plot, y=Vu, name="Vu (kN/m)"))
 
         st.plotly_chart(fig, use_container_width=True)
 
     else:
-        st.warning("Need valid data")
+        st.warning("Need at least 2 valid points")
