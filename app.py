@@ -199,3 +199,71 @@ if st.checkbox("Show Debug Data"):
     st.write("Section:", df_thk)
     st.write("Tendon:", df_tdn)
     st.write("Load:", df_ld)
+
+
+
+# ==============================
+# PHASE 2: SECTION PROPERTIES + STRESS
+# ==============================
+
+st.subheader("🧮 Phase 2 — Section & Stress (Service I)")
+
+if len(df_thk) >= 2 and len(df_tdn) >= 2 and len(df_ld) >= 2:
+
+    # -------- INPUT --------
+    fc = st.sidebar.number_input("f'c (MPa)", value=40.0)
+    strands = st.sidebar.number_input("Number of Strands", value=8)
+    aps = 140e-6   # m² per strand
+    fpu = 1860     # MPa
+    eff = st.sidebar.slider("Effective Prestress Ratio", 0.5, 0.9, 0.75)
+
+    # -------- PRESTRESS FORCE --------
+    P = strands * aps * fpu * eff * 1000   # kN
+
+    # -------- GRID --------
+    x_plot = np.linspace(0, width, 400)
+
+    # -------- INTERPOLATION --------
+    t = np.interp(x_plot, df_thk["x (m)"], df_thk["t (m)"])
+    z = np.interp(x_plot, df_tdn["x (m)"], df_tdn["z from top (m)"])
+
+    M_DL = np.interp(x_plot, df_ld["x (m)"], df_ld["M_DL"])
+    M_SDL = np.interp(x_plot, df_ld["x (m)"], df_ld["M_SDL"])
+    M_LL = np.interp(x_plot, df_ld["x (m)"], df_ld["M_LL"])
+
+    # Service I
+    M = M_DL + M_SDL + M_LL
+
+    # -------- SECTION PROPERTIES --------
+    b = 1.0  # 1m strip
+
+    A = b * t
+    yc = t / 2
+    I = b * t**3 / 12
+
+    # -------- ECCENTRICITY --------
+    e = yc - z
+
+    # -------- STRESS --------
+    y_top = yc
+    y_bot = -yc
+
+    sigma_top = (P / A) - (P * e * y_top / I) - (M * y_top / I)
+    sigma_bot = (P / A) - (P * e * y_bot / I) - (M * y_bot / I)
+
+    # -------- PLOT --------
+    fig3 = go.Figure()
+
+    fig3.add_trace(go.Scatter(x=x_plot, y=sigma_top, name="Top Stress (MPa)"))
+    fig3.add_trace(go.Scatter(x=x_plot, y=sigma_bot, name="Bottom Stress (MPa)"))
+
+    fig3.update_layout(
+        title="Service I Stress",
+        xaxis_title="x (m)",
+        yaxis_title="Stress (MPa)"
+    )
+
+    st.plotly_chart(fig3, use_container_width=True)
+
+    # -------- DISPLAY --------
+    st.write(f"Prestress Force P = {P:.2f} kN")
