@@ -25,7 +25,7 @@ tab1, tab2, tab3, tab4 = st.tabs(["Section", "Tendon", "Loads", "Visualization"]
 with tab1:
     st.header("Section Properties")
 
-    width = st.number_input("Top Flange Width (m)", value=3.0)
+    width = st.number_input("Top Flange Width (m)", value=6.0)
     web_thickness = st.number_input("Web Thickness (m)", value=0.5)
 
     # -------- Thickness --------
@@ -35,31 +35,35 @@ with tab1:
         "t (m)": [0.25, 0.25]
     }))
 
-    st.subheader("Thickness Input")
     df_thickness = st.data_editor(
         st.session_state.df_thickness,
         num_rows="dynamic",
         key="thickness_editor"
     )
 
+    # 🔴 FIX DELETE BUG
+    df_thickness["Delete"] = df_thickness["Delete"].fillna(False)
     df_thickness = df_thickness[df_thickness["Delete"] == False]
+
     st.session_state.df_thickness = df_thickness
 
-    # -------- Tendon (Preview) --------
+    # -------- Tendon --------
     init_df("df_tendon", pd.DataFrame({
         "Delete": [False, False],
         "x (m)": [0.0, width],
         "z from top (m)": [0.10, 0.10]
     }))
 
-    st.subheader("Tendon Profile (Preview)")
     df_tendon = st.data_editor(
         st.session_state.df_tendon,
         num_rows="dynamic",
         key="tendon_editor_section"
     )
 
+    # 🔴 FIX DELETE BUG
+    df_tendon["Delete"] = df_tendon["Delete"].fillna(False)
     df_tendon = df_tendon[df_tendon["Delete"] == False]
+
     st.session_state.df_tendon = df_tendon
 
     # -------- PREVIEW --------
@@ -67,7 +71,7 @@ with tab1:
 
     if len(df_thickness) >= 2 and len(df_tendon) >= 2:
 
-        x = np.linspace(0, width, 200)
+        x = np.linspace(0, width, 300)
 
         # ===== CLEAN THICKNESS =====
         df_thk = df_thickness.drop(columns=["Delete"], errors="ignore")
@@ -107,7 +111,7 @@ with tab1:
             st.plotly_chart(fig, use_container_width=True)
 
         else:
-            st.warning("Invalid numeric input")
+            st.warning("Invalid numeric data")
 
     else:
         st.info("Enter at least 2 points")
@@ -116,12 +120,7 @@ with tab1:
 # TAB 2: TENDON INFO
 # ==============================
 with tab2:
-    st.header("Tendon Design Input")
-
-    strands = st.number_input("Number of Strands", value=8)
-    spacing = st.number_input("Spacing (m)", value=0.3)
-
-    st.write("Current Tendon Table:")
+    st.header("Tendon Info")
     st.write(st.session_state.df_tendon)
 
 # ==============================
@@ -147,7 +146,10 @@ with tab3:
         key="load_editor"
     )
 
+    # 🔴 FIX DELETE BUG
+    df_load["Delete"] = df_load["Delete"].fillna(False)
     df_load = df_load[df_load["Delete"] == False]
+
     st.session_state.df_load = df_load
 
     if len(df_load) >= 2:
@@ -162,7 +164,7 @@ with tab3:
 
         if len(df) >= 2:
 
-            x_plot = np.linspace(0, width, 200)
+            x_plot = np.linspace(0, width, 300)
 
             Mu = (
                 1.25*np.interp(x_plot, df["x (m)"], df["M_DL"]) +
@@ -175,10 +177,6 @@ with tab3:
                 1.50*np.interp(x_plot, df["x (m)"], df["V_SDL"]) +
                 1.75*np.interp(x_plot, df["x (m)"], df["V_LL"])
             )
-
-            st.subheader("Strength I (AASHTO LRFD)")
-            st.write("Mu = 1.25 DL + 1.50 SDL + 1.75 LL")
-            st.write("Vu = 1.25 DL + 1.50 SDL + 1.75 LL")
 
             fig = go.Figure()
             fig.add_trace(go.Scatter(x=x_plot, y=Mu, name="Mu"))
@@ -193,8 +191,8 @@ with tab3:
         st.warning("Need at least 2 points")
 
 # ==============================
-# TAB 4: VISUALIZATION
+# TAB 4
 # ==============================
 with tab4:
-    st.header("Advanced Visualization")
-    st.info("Use Section tab for real-time preview")
+    st.header("Visualization")
+    st.info("Use Section tab for preview")
