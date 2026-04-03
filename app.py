@@ -8,9 +8,10 @@ st.set_page_config(layout="wide")
 st.title("Prestressed Concrete Box Girder — Top Flange Tendon Design")
 
 # =========================================================
-# INIT STATE (RUN ONCE)
+# INIT STATE
 # =========================================================
 if "init" not in st.session_state:
+
     st.session_state.df_thk = pd.DataFrame({
         "Delete":[False,False],
         "x (m)":[0.0,6.0],
@@ -32,6 +33,18 @@ if "init" not in st.session_state:
     })
 
     st.session_state.init = True
+
+# =========================================================
+# CALLBACK SYNC (🔥 KEY FIX)
+# =========================================================
+def sync_thk():
+    st.session_state.df_thk = st.session_state.thk_editor
+
+def sync_tdn():
+    st.session_state.df_tdn = st.session_state.tdn_editor
+
+def sync_ld():
+    st.session_state.df_ld = st.session_state.ld_editor
 
 # =========================================================
 # CLEAN FUNCTION
@@ -71,41 +84,41 @@ aps = 140e-6
 fpu = 1860
 
 # =========================================================
-# DATA EDITOR (AUTO SYNC)
+# DATA EDITOR (🔥 FIXED)
 # =========================================================
 st.sidebar.subheader("Section Geometry")
 
 df_thk = st.sidebar.data_editor(
     st.session_state.df_thk,
     num_rows="dynamic",
-    key="thk_editor"
+    key="thk_editor",
+    on_change=sync_thk
 )
-st.session_state.df_thk = df_thk
 
 st.sidebar.subheader("Tendon Profile")
 
 df_tdn = st.sidebar.data_editor(
     st.session_state.df_tdn,
     num_rows="dynamic",
-    key="tdn_editor"
+    key="tdn_editor",
+    on_change=sync_tdn
 )
-st.session_state.df_tdn = df_tdn
 
 st.sidebar.subheader("Loads")
 
 df_ld = st.sidebar.data_editor(
     st.session_state.df_ld,
     num_rows="dynamic",
-    key="ld_editor"
+    key="ld_editor",
+    on_change=sync_ld
 )
-st.session_state.df_ld = df_ld
 
 # =========================================================
 # CLEAN DATA
 # =========================================================
-df_thk = clean_df(df_thk)
-df_tdn = clean_df(df_tdn)
-df_ld = clean_df(df_ld)
+df_thk = clean_df(st.session_state.df_thk)
+df_tdn = clean_df(st.session_state.df_tdn)
+df_ld = clean_df(st.session_state.df_ld)
 
 x = np.linspace(0, width, 400)
 
@@ -140,9 +153,9 @@ if len(df_thk) >= 2 and len(df_tdn) >= 2:
     st.plotly_chart(fig, use_container_width=True)
 
 # =========================================================
-# LOAD GRAPH
+# LOAD
 # =========================================================
-st.subheader("📊 Load (Strength I — AASHTO LRFD)")
+st.subheader("📊 Load (Strength I)")
 
 if len(df_ld) >= 2:
 
@@ -179,7 +192,6 @@ if len(df_thk)>=2 and len(df_tdn)>=2 and len(df_ld)>=2:
          interp(x, df_ld,"M_SDL") +
          interp(x, df_ld,"M_LL"))
 
-    # Prestress = Compression (NEGATIVE)
     P = - n_tendon*n_strand*aps*fpu*eff*1000
 
     A = t
@@ -210,5 +222,3 @@ if len(df_thk)>=2 and len(df_tdn)>=2 and len(df_ld)>=2:
     st.plotly_chart(fig3, use_container_width=True)
 
     st.write(f"Prestress Force P = {P:.2f} kN (Compression)")
-
-
