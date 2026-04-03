@@ -35,22 +35,33 @@ if "init" not in st.session_state:
     st.session_state.init = True
 
 # =========================================================
-# CALLBACK SYNC (🔥 KEY FIX)
+# SAFE CONVERT (🔥 ป้องกัน dict bug)
+# =========================================================
+def ensure_df(data):
+    if isinstance(data, pd.DataFrame):
+        return data
+    try:
+        return pd.DataFrame(data)
+    except:
+        return pd.DataFrame()
+
+# =========================================================
+# CALLBACK (🔥 FIX TYPE)
 # =========================================================
 def sync_thk():
-    st.session_state.df_thk = st.session_state.thk_editor
+    st.session_state.df_thk = ensure_df(st.session_state.thk_editor)
 
 def sync_tdn():
-    st.session_state.df_tdn = st.session_state.tdn_editor
+    st.session_state.df_tdn = ensure_df(st.session_state.tdn_editor)
 
 def sync_ld():
-    st.session_state.df_ld = st.session_state.ld_editor
+    st.session_state.df_ld = ensure_df(st.session_state.ld_editor)
 
 # =========================================================
 # CLEAN FUNCTION
 # =========================================================
 def clean_df(df):
-    df = df.copy()
+    df = ensure_df(df).copy()
 
     if "Delete" in df.columns:
         df = df[df["Delete"] != True]
@@ -71,25 +82,25 @@ def clean_df(df):
 # =========================================================
 st.sidebar.header("Input")
 
-width = st.sidebar.number_input("Width (m)", 0.1, 20.0, 6.0, key="width")
-web_t = st.sidebar.number_input("Web Thickness (m)", 0.1, 5.0, 0.5, key="web")
+width = st.sidebar.number_input("Width (m)", 0.1, 20.0, 6.0)
+web_t = st.sidebar.number_input("Web Thickness (m)", 0.1, 5.0, 0.5)
 
-n_tendon = st.sidebar.number_input("Number of Tendons", 1, 20, 2, key="nt")
-n_strand = st.sidebar.number_input("Strands / Tendon", 1, 30, 8, key="ns")
+n_tendon = st.sidebar.number_input("Number of Tendons", 1, 20, 2)
+n_strand = st.sidebar.number_input("Strands / Tendon", 1, 30, 8)
 
-fc = st.sidebar.number_input("f'c (MPa)", 20.0, 80.0, 40.0, key="fc")
-eff = st.sidebar.slider("Prestress Efficiency", 0.5, 0.9, 0.75, key="eff")
+fc = st.sidebar.number_input("f'c (MPa)", 20.0, 80.0, 40.0)
+eff = st.sidebar.slider("Prestress Efficiency", 0.5, 0.9, 0.75)
 
 aps = 140e-6
 fpu = 1860
 
 # =========================================================
-# DATA EDITOR (🔥 FIXED)
+# DATA EDITOR (🔥 STABLE)
 # =========================================================
 st.sidebar.subheader("Section Geometry")
 
 df_thk = st.sidebar.data_editor(
-    st.session_state.df_thk,
+    ensure_df(st.session_state.df_thk),
     num_rows="dynamic",
     key="thk_editor",
     on_change=sync_thk
@@ -98,7 +109,7 @@ df_thk = st.sidebar.data_editor(
 st.sidebar.subheader("Tendon Profile")
 
 df_tdn = st.sidebar.data_editor(
-    st.session_state.df_tdn,
+    ensure_df(st.session_state.df_tdn),
     num_rows="dynamic",
     key="tdn_editor",
     on_change=sync_tdn
@@ -107,7 +118,7 @@ df_tdn = st.sidebar.data_editor(
 st.sidebar.subheader("Loads")
 
 df_ld = st.sidebar.data_editor(
-    st.session_state.df_ld,
+    ensure_df(st.session_state.df_ld),
     num_rows="dynamic",
     key="ld_editor",
     on_change=sync_ld
