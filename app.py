@@ -75,7 +75,7 @@ aps = 140e-6   # m²
 fpu = 1860     # MPa
 
 # Loads
-st.sidebar.subheader("Loads")
+st.sidebar.subheader("Loads (From FEA Results)")
 
 df_load = st.sidebar.data_editor(
     st.session_state.df_load,
