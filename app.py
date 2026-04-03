@@ -37,92 +37,86 @@ if "df_load" not in st.session_state:
     })
 
 # ==============================
-# TAB SETUP
+# SIDEBAR INPUT
 # ==============================
-tab1, tab2 = st.tabs(["Section + Tendon", "Loads"])
+st.sidebar.header("Input Panel")
+
+# -------- SECTION --------
+st.sidebar.subheader("Section")
+
+width = st.sidebar.number_input("Width (m)", value=6.0)
+web_thickness = st.sidebar.number_input("Web Thickness (m)", value=0.5)
+
+df_thickness = st.sidebar.data_editor(
+    st.session_state.df_thickness,
+    num_rows="dynamic",
+    key="thickness_editor"
+)
+
+# -------- TENDON --------
+st.sidebar.subheader("Tendon")
+
+df_tendon = st.sidebar.data_editor(
+    st.session_state.df_tendon,
+    num_rows="dynamic",
+    key="tendon_editor"
+)
+
+# -------- LOAD --------
+st.sidebar.subheader("Loads")
+
+df_load = st.sidebar.data_editor(
+    st.session_state.df_load,
+    num_rows="dynamic",
+    key="load_editor"
+)
 
 # ==============================
-# TAB 1: SECTION + TENDON
+# CLEAN DATA
 # ==============================
-with tab1:
-    st.header("Section + Tendon")
 
-    col1, col2 = st.columns(2)
+def clean_df(df):
+    df = df.copy()
+    df["Delete"] = df["Delete"].fillna(False)
+    df = df[df["Delete"] == False]
 
-    # -------- SECTION --------
-    with col1:
-        width = st.number_input("Width (m)", value=6.0)
-        web_thickness = st.number_input("Web Thickness (m)", value=0.5)
+    for col in df.columns:
+        df[col] = pd.to_numeric(df[col], errors='coerce')
 
-        st.subheader("Thickness Table")
+    df = df.dropna()
+    df = df.drop_duplicates(subset="x (m)")
+    df = df.sort_values("x (m)")
 
-        df_thickness = st.data_editor(
-            st.session_state.df_thickness,
-            num_rows="dynamic",
-            key="thickness_editor"
-        )
+    return df
 
-        df_thk = df_thickness.copy()
-        df_thk["Delete"] = df_thk["Delete"].fillna(False)
-        df_thk = df_thk[df_thk["Delete"] == False]
+df_thk = clean_df(df_thickness)
+df_tdn = clean_df(df_tendon)
+df_ld = clean_df(df_load)
 
-        df_thk["x (m)"] = pd.to_numeric(df_thk["x (m)"], errors='coerce')
-        df_thk["t (m)"] = pd.to_numeric(df_thk["t (m)"], errors='coerce')
+# ==============================
+# MAIN SCREEN
+# ==============================
 
-        df_thk = df_thk.dropna()
-        df_thk = df_thk.drop_duplicates(subset="x (m)")
-        df_thk = df_thk.sort_values("x (m)")
+col1, col2 = st.columns([2, 1])
 
-    # -------- TENDON --------
-    with col2:
-        st.subheader("Tendon Profile Table")
-
-        df_tendon = st.data_editor(
-            st.session_state.df_tendon,
-            num_rows="dynamic",
-            key="tendon_editor"
-        )
-
-        df_tdn = df_tendon.copy()
-        df_tdn["Delete"] = df_tdn["Delete"].fillna(False)
-        df_tdn = df_tdn[df_tdn["Delete"] == False]
-
-        df_tdn["x (m)"] = pd.to_numeric(df_tdn["x (m)"], errors='coerce')
-        df_tdn["z from top (m)"] = pd.to_numeric(df_tdn["z from top (m)"], errors='coerce')
-
-        df_tdn = df_tdn.dropna()
-        df_tdn = df_tdn.drop_duplicates(subset="x (m)")
-        df_tdn = df_tdn.sort_values("x (m)")
-
-    # -------- PREVIEW --------
-    st.subheader("🔍 Section + Tendon Preview")
+# ==============================
+# LEFT: SECTION VIEW
+# ==============================
+with col1:
+    st.subheader("🔍 Section + Tendon")
 
     if len(df_thk) >= 2 and len(df_tdn) >= 2:
 
         x_plot = np.linspace(0, width, 400)
 
-        # -------- INTERPOLATION --------
-        t_interp = np.interp(
-            x_plot,
-            df_thk["x (m)"],
-            df_thk["t (m)"]
-        )
-
-        z_interp = np.interp(
-            x_plot,
-            df_tdn["x (m)"],
-            df_tdn["z from top (m)"]
-        )
+        t_interp = np.interp(x_plot, df_thk["x (m)"], df_thk["t (m)"])
+        z_interp = np.interp(x_plot, df_tdn["x (m)"], df_tdn["z from top (m)"])
 
         fig = go.Figure()
 
-        # Top
         fig.add_trace(go.Scatter(x=x_plot, y=np.zeros_like(x_plot), name="Top"))
-
-        # Bottom
         fig.add_trace(go.Scatter(x=x_plot, y=-t_interp, name="Bottom"))
 
-        # Tendon
         fig.add_trace(go.Scatter(
             x=x_plot,
             y=-z_interp,
@@ -130,70 +124,53 @@ with tab1:
             line=dict(width=3)
         ))
 
-        # Web
         fig.add_vline(x=web_thickness/2)
         fig.add_vline(x=width - web_thickness/2)
 
         fig.update_layout(
-            title="Top Flange Section + Tendon",
+            title="Section View",
             yaxis_title="Depth (m)"
         )
 
         st.plotly_chart(fig, use_container_width=True)
 
     else:
-        st.warning("Need at least 2 valid points")
+        st.warning("Need at least 2 points")
 
 # ==============================
-# TAB 2: LOADS
+# RIGHT: LOAD GRAPH
 # ==============================
-with tab2:
-    st.header("Loads")
-
-    df_load = st.data_editor(
-        st.session_state.df_load,
-        num_rows="dynamic",
-        key="load_editor"
-    )
-
-    df_ld = df_load.copy()
-    df_ld["Delete"] = df_ld["Delete"].fillna(False)
-    df_ld = df_ld[df_ld["Delete"] == False]
-
-    for col in df_ld.columns:
-        df_ld[col] = pd.to_numeric(df_ld[col], errors='coerce')
-
-    df_ld = df_ld.dropna()
-    df_ld = df_ld.drop_duplicates(subset="x (m)")
-    df_ld = df_ld.sort_values("x (m)")
-
-    st.subheader("Clean Load Data")
-    st.dataframe(df_ld)
+with col2:
+    st.subheader("📊 Load (Strength I)")
 
     if len(df_ld) >= 2:
 
         x_plot = np.linspace(0, width, 400)
 
-        # -------- INTERPOLATION --------
-        M_DL_i = np.interp(x_plot, df_ld["x (m)"], df_ld["M_DL"])
-        M_SDL_i = np.interp(x_plot, df_ld["x (m)"], df_ld["M_SDL"])
-        M_LL_i = np.interp(x_plot, df_ld["x (m)"], df_ld["M_LL"])
+        M_DL = np.interp(x_plot, df_ld["x (m)"], df_ld["M_DL"])
+        M_SDL = np.interp(x_plot, df_ld["x (m)"], df_ld["M_SDL"])
+        M_LL = np.interp(x_plot, df_ld["x (m)"], df_ld["M_LL"])
 
-        V_DL_i = np.interp(x_plot, df_ld["x (m)"], df_ld["V_DL"])
-        V_SDL_i = np.interp(x_plot, df_ld["x (m)"], df_ld["V_SDL"])
-        V_LL_i = np.interp(x_plot, df_ld["x (m)"], df_ld["V_LL"])
+        V_DL = np.interp(x_plot, df_ld["x (m)"], df_ld["V_DL"])
+        V_SDL = np.interp(x_plot, df_ld["x (m)"], df_ld["V_SDL"])
+        V_LL = np.interp(x_plot, df_ld["x (m)"], df_ld["V_LL"])
 
-        Mu = 1.25*M_DL_i + 1.50*M_SDL_i + 1.75*M_LL_i
-        Vu = 1.25*V_DL_i + 1.50*V_SDL_i + 1.75*V_LL_i
+        Mu = 1.25*M_DL + 1.50*M_SDL + 1.75*M_LL
+        Vu = 1.25*V_DL + 1.50*V_SDL + 1.75*V_LL
 
-        st.subheader("Strength I — AASHTO LRFD")
-        st.write("Mu = 1.25 DL + 1.50 SDL + 1.75 LL")
+        fig2 = go.Figure()
+        fig2.add_trace(go.Scatter(x=x_plot, y=Mu, name="Mu"))
+        fig2.add_trace(go.Scatter(x=x_plot, y=Vu, name="Vu"))
 
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=x_plot, y=Mu, name="Mu (kN·m/m)"))
-        fig.add_trace(go.Scatter(x=x_plot, y=Vu, name="Vu (kN/m)"))
-
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig2, use_container_width=True)
 
     else:
-        st.warning("Need at least 2 valid points")
+        st.warning("Need load data")
+
+# ==============================
+# OPTIONAL DEBUG
+# ==============================
+if st.checkbox("Show Debug Data"):
+    st.write("Section:", df_thk)
+    st.write("Tendon:", df_tdn)
+    st.write("Load:", df_ld)
