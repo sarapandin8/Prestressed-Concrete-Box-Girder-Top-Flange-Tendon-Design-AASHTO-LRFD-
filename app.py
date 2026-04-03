@@ -66,38 +66,47 @@ with tab3:
 
     if len(df_load) >= 2:
 
-        x_plot = np.linspace(0, width, 100)
+        # Clean data
+        df_load_clean = df_load.dropna()
+        for col in df_load_clean.columns:
+            df_load_clean[col] = pd.to_numeric(df_load_clean[col], errors='coerce')
 
-        # Interpolation
-        M_DL_i = np.interp(x_plot, df_load["x (m)"], df_load["M_DL"])
-        V_DL_i = np.interp(x_plot, df_load["x (m)"], df_load["V_DL"])
+        df_load_clean = df_load_clean.dropna()
+        df_load_clean = df_load_clean.sort_values("x (m)")
 
-        M_SDL_i = np.interp(x_plot, df_load["x (m)"], df_load["M_SDL"])
-        V_SDL_i = np.interp(x_plot, df_load["x (m)"], df_load["V_SDL"])
+        if len(df_load_clean) >= 2:
 
-        M_LL_i = np.interp(x_plot, df_load["x (m)"], df_load["M_LL"])
-        V_LL_i = np.interp(x_plot, df_load["x (m)"], df_load["V_LL"])
+            x_plot = np.linspace(0, width, 100)
 
-        # Strength I Combination
-        Mu = 1.25*M_DL_i + 1.50*M_SDL_i + 1.75*M_LL_i
-        Vu = 1.25*V_DL_i + 1.50*V_SDL_i + 1.75*V_LL_i
+            # Interpolation
+            M_DL_i = np.interp(x_plot, df_load_clean["x (m)"], df_load_clean["M_DL"])
+            V_DL_i = np.interp(x_plot, df_load_clean["x (m)"], df_load_clean["V_DL"])
 
-        st.subheader("Load Combination — Strength I (AASHTO LRFD)")
+            M_SDL_i = np.interp(x_plot, df_load_clean["x (m)"], df_load_clean["M_SDL"])
+            V_SDL_i = np.interp(x_plot, df_load_clean["x (m)"], df_load_clean["V_SDL"])
 
-        st.write("Mu = 1.25·M_DL + 1.50·M_SDL + 1.75·M_LL")
-        st.write("Vu = 1.25·V_DL + 1.50·V_SDL + 1.75·V_LL")
+            M_LL_i = np.interp(x_plot, df_load_clean["x (m)"], df_load_clean["M_LL"])
+            V_LL_i = np.interp(x_plot, df_load_clean["x (m)"], df_load_clean["V_LL"])
 
-        st.write("Reference: AASHTO LRFD Table 3.4.1-1")
+            # Strength I Combination
+            Mu = 1.25*M_DL_i + 1.50*M_SDL_i + 1.75*M_LL_i
+            Vu = 1.25*V_DL_i + 1.50*V_SDL_i + 1.75*V_LL_i
 
-        # Plot
-        fig_load = go.Figure()
+            st.subheader("Load Combination — Strength I")
+            st.write("Mu = 1.25·M_DL + 1.50·M_SDL + 1.75·M_LL")
+            st.write("Vu = 1.25·V_DL + 1.50·V_SDL + 1.75·V_LL")
+            st.write("Reference: AASHTO LRFD Table 3.4.1-1")
 
-        fig_load.add_trace(go.Scatter(x=x_plot, y=Mu, name="Mu (kN·m/m)"))
-        fig_load.add_trace(go.Scatter(x=x_plot, y=Vu, name="Vu (kN/m)"))
+            # Plot
+            fig_load = go.Figure()
+            fig_load.add_trace(go.Scatter(x=x_plot, y=Mu, name="Mu (kN·m/m)"))
+            fig_load.add_trace(go.Scatter(x=x_plot, y=Vu, name="Vu (kN/m)"))
+            fig_load.update_layout(title="Strength I — Load Distribution")
 
-        fig_load.update_layout(title="Strength I — Load Distribution")
+            st.plotly_chart(fig_load, use_container_width=True)
 
-        st.plotly_chart(fig_load, use_container_width=True)
+        else:
+            st.error("Load input must have at least 2 valid numeric points.")
 
     else:
         st.warning("Please input at least two points.")
@@ -116,7 +125,24 @@ with tab4:
         t_interp = np.interp(x, df_thickness["x (m)"], df_thickness["t (m)"])
 
         # Interpolate tendon
-        z_interp = np.interp(x, df_tendon["x (m)"], df_tendon["z from top (m)"])
+        # Clean tendon data before interpolation
+df_tendon_clean = df_tendon.dropna()
+
+df_tendon_clean["x (m)"] = pd.to_numeric(df_tendon_clean["x (m)"], errors='coerce')
+df_tendon_clean["z from top (m)"] = pd.to_numeric(df_tendon_clean["z from top (m)"], errors='coerce')
+
+df_tendon_clean = df_tendon_clean.dropna()
+df_tendon_clean = df_tendon_clean.sort_values("x (m)")
+
+if len(df_tendon_clean) >= 2:
+    z_interp = np.interp(
+        x,
+        df_tendon_clean["x (m)"],
+        df_tendon_clean["z from top (m)"]
+    )
+else:
+    st.error("Tendon profile must have at least 2 valid numeric points.")
+    z_interp = np.zeros_like(x)
 
         fig = go.Figure()
 
