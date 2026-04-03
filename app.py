@@ -44,7 +44,7 @@ with tab2:
     )
 
 # ==============================
-# TAB 3: LOADS
+# TAB 3: LOADS (FIXED)
 # ==============================
 with tab3:
     st.header("Applied Loads (per 1m strip) — Variable along width")
@@ -66,7 +66,6 @@ with tab3:
 
     if len(df_load) >= 2:
 
-        # Clean data
         df_load_clean = df_load.dropna()
         for col in df_load_clean.columns:
             df_load_clean[col] = pd.to_numeric(df_load_clean[col], errors='coerce')
@@ -78,7 +77,6 @@ with tab3:
 
             x_plot = np.linspace(0, width, 100)
 
-            # Interpolation
             M_DL_i = np.interp(x_plot, df_load_clean["x (m)"], df_load_clean["M_DL"])
             V_DL_i = np.interp(x_plot, df_load_clean["x (m)"], df_load_clean["V_DL"])
 
@@ -88,7 +86,6 @@ with tab3:
             M_LL_i = np.interp(x_plot, df_load_clean["x (m)"], df_load_clean["M_LL"])
             V_LL_i = np.interp(x_plot, df_load_clean["x (m)"], df_load_clean["V_LL"])
 
-            # Strength I Combination
             Mu = 1.25*M_DL_i + 1.50*M_SDL_i + 1.75*M_LL_i
             Vu = 1.25*V_DL_i + 1.50*V_SDL_i + 1.75*V_LL_i
 
@@ -97,7 +94,6 @@ with tab3:
             st.write("Vu = 1.25·V_DL + 1.50·V_SDL + 1.75·V_LL")
             st.write("Reference: AASHTO LRFD Table 3.4.1-1")
 
-            # Plot
             fig_load = go.Figure()
             fig_load.add_trace(go.Scatter(x=x_plot, y=Mu, name="Mu (kN·m/m)"))
             fig_load.add_trace(go.Scatter(x=x_plot, y=Vu, name="Vu (kN/m)"))
@@ -112,7 +108,7 @@ with tab3:
         st.warning("Please input at least two points.")
 
 # ==============================
-# TAB 4: VISUALIZATION
+# TAB 4: VISUALIZATION (FIXED)
 # ==============================
 with tab4:
     st.header("Section & Tendon Visualization")
@@ -121,41 +117,31 @@ with tab4:
 
         x = np.linspace(0, width, 100)
 
-        # Interpolate thickness
         t_interp = np.interp(x, df_thickness["x (m)"], df_thickness["t (m)"])
 
-        # Interpolate tendon
-        # Clean tendon data before interpolation
-df_tendon_clean = df_tendon.dropna()
+        # Clean tendon data
+        df_tendon_clean = df_tendon.dropna()
+        df_tendon_clean["x (m)"] = pd.to_numeric(df_tendon_clean["x (m)"], errors='coerce')
+        df_tendon_clean["z from top (m)"] = pd.to_numeric(df_tendon_clean["z from top (m)"], errors='coerce')
 
-df_tendon_clean["x (m)"] = pd.to_numeric(df_tendon_clean["x (m)"], errors='coerce')
-df_tendon_clean["z from top (m)"] = pd.to_numeric(df_tendon_clean["z from top (m)"], errors='coerce')
+        df_tendon_clean = df_tendon_clean.dropna()
+        df_tendon_clean = df_tendon_clean.sort_values("x (m)")
 
-df_tendon_clean = df_tendon_clean.dropna()
-df_tendon_clean = df_tendon_clean.sort_values("x (m)")
-
-if len(df_tendon_clean) >= 2:
-    z_interp = np.interp(
-        x,
-        df_tendon_clean["x (m)"],
-        df_tendon_clean["z from top (m)"]
-    )
-else:
-    st.error("Tendon profile must have at least 2 valid numeric points.")
-    z_interp = np.zeros_like(x)
+        if len(df_tendon_clean) >= 2:
+            z_interp = np.interp(
+                x,
+                df_tendon_clean["x (m)"],
+                df_tendon_clean["z from top (m)"]
+            )
+        else:
+            st.error("Tendon profile must have at least 2 valid numeric points.")
+            z_interp = np.zeros_like(x)
 
         fig = go.Figure()
-
-        # Top surface
         fig.add_trace(go.Scatter(x=x, y=np.zeros_like(x), name="Top Surface"))
-
-        # Bottom surface
         fig.add_trace(go.Scatter(x=x, y=-t_interp, name="Bottom Surface"))
-
-        # Tendon
         fig.add_trace(go.Scatter(x=x, y=-z_interp, mode='lines', name="Tendon Profile"))
 
-        # Webs
         fig.add_vline(x=web_thickness/2)
         fig.add_vline(x=width - web_thickness/2)
 
@@ -163,7 +149,7 @@ else:
 
         st.plotly_chart(fig, use_container_width=True)
 
-        # Dummy flexural capacity (placeholder)
+        # Dummy flexural capacity
         phiMn = np.ones_like(x) * Mu * 1.2
 
         fig2 = go.Figure()
