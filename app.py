@@ -54,6 +54,8 @@ with tab1:
         width = st.number_input("Width (m)", value=6.0)
         web_thickness = st.number_input("Web Thickness (m)", value=0.5)
 
+        st.subheader("Thickness Table")
+
         df_thickness = st.data_editor(
             st.session_state.df_thickness,
             num_rows="dynamic",
@@ -73,6 +75,8 @@ with tab1:
 
     # -------- TENDON --------
     with col2:
+        st.subheader("Tendon Profile Table")
+
         df_tendon = st.data_editor(
             st.session_state.df_tendon,
             num_rows="dynamic",
@@ -91,30 +95,34 @@ with tab1:
         df_tdn = df_tdn.sort_values("x (m)")
 
     # -------- PREVIEW --------
-    st.subheader("Preview")
+    st.subheader("🔍 Section + Tendon Preview")
 
     if len(df_thk) >= 2 and len(df_tdn) >= 2:
 
         x_plot = np.linspace(0, width, 400)
 
-        # ----- SECTION INTERPOLATION -----
-        df_sec = df_thk.set_index("x (m)")
-        df_sec = df_sec.select_dtypes(include=[np.number]).astype(float)
-        df_sec = df_sec.reindex(x_plot).interpolate()
+        # -------- INTERPOLATION --------
+        t_interp = np.interp(
+            x_plot,
+            df_thk["x (m)"],
+            df_thk["t (m)"]
+        )
 
-        # ----- TENDON INTERPOLATION -----
-        df_ten = df_tdn.set_index("x (m)")
-        df_ten = df_ten.select_dtypes(include=[np.number]).astype(float)
-        df_ten = df_ten.reindex(x_plot).interpolate()
-
-        t_interp = df_sec["t (m)"]
-        z_interp = df_ten["z from top (m)"]
+        z_interp = np.interp(
+            x_plot,
+            df_tdn["x (m)"],
+            df_tdn["z from top (m)"]
+        )
 
         fig = go.Figure()
 
+        # Top
         fig.add_trace(go.Scatter(x=x_plot, y=np.zeros_like(x_plot), name="Top"))
+
+        # Bottom
         fig.add_trace(go.Scatter(x=x_plot, y=-t_interp, name="Bottom"))
 
+        # Tendon
         fig.add_trace(go.Scatter(
             x=x_plot,
             y=-z_interp,
@@ -122,11 +130,12 @@ with tab1:
             line=dict(width=3)
         ))
 
+        # Web
         fig.add_vline(x=web_thickness/2)
         fig.add_vline(x=width - web_thickness/2)
 
         fig.update_layout(
-            title="Section + Tendon",
+            title="Top Flange Section + Tendon",
             yaxis_title="Depth (m)"
         )
 
@@ -158,20 +167,26 @@ with tab2:
     df_ld = df_ld.drop_duplicates(subset="x (m)")
     df_ld = df_ld.sort_values("x (m)")
 
-    st.write("Clean Load Data:", df_ld)
+    st.subheader("Clean Load Data")
+    st.dataframe(df_ld)
 
     if len(df_ld) >= 2:
 
         x_plot = np.linspace(0, width, 400)
 
-        df_interp = df_ld.set_index("x (m)")
-        df_interp = df_interp.select_dtypes(include=[np.number]).astype(float)
-        df_interp = df_interp.reindex(x_plot).interpolate()
+        # -------- INTERPOLATION --------
+        M_DL_i = np.interp(x_plot, df_ld["x (m)"], df_ld["M_DL"])
+        M_SDL_i = np.interp(x_plot, df_ld["x (m)"], df_ld["M_SDL"])
+        M_LL_i = np.interp(x_plot, df_ld["x (m)"], df_ld["M_LL"])
 
-        Mu = 1.25*df_interp["M_DL"] + 1.5*df_interp["M_SDL"] + 1.75*df_interp["M_LL"]
-        Vu = 1.25*df_interp["V_DL"] + 1.5*df_interp["V_SDL"] + 1.75*df_interp["V_LL"]
+        V_DL_i = np.interp(x_plot, df_ld["x (m)"], df_ld["V_DL"])
+        V_SDL_i = np.interp(x_plot, df_ld["x (m)"], df_ld["V_SDL"])
+        V_LL_i = np.interp(x_plot, df_ld["x (m)"], df_ld["V_LL"])
 
-        st.subheader("Strength I (AASHTO LRFD)")
+        Mu = 1.25*M_DL_i + 1.50*M_SDL_i + 1.75*M_LL_i
+        Vu = 1.25*V_DL_i + 1.50*V_SDL_i + 1.75*V_LL_i
+
+        st.subheader("Strength I — AASHTO LRFD")
         st.write("Mu = 1.25 DL + 1.50 SDL + 1.75 LL")
 
         fig = go.Figure()
