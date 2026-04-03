@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 
 st.set_page_config(layout="wide")
 
-st.title("Prestressed Concrete Box Girder — Top Flange Tendon Design")
+st.title("Concrete Box Girder — Top Flange Transverse Tendon Design")
 
 # ==============================
 # INIT SESSION
