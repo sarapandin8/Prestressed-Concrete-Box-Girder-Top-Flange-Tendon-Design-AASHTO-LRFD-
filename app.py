@@ -248,8 +248,8 @@ if len(df_thk) >= 2 and len(df_tdn) >= 2 and len(df_ld) >= 2:
     y_top = yc
     y_bot = -yc
 
-    sigma_top = (P / A) - (P * e * y_top / I) - (M * y_top / I)
-    sigma_bot = (P / A) - (P * e * y_bot / I) - (M * y_bot / I)
+    sigma_top = ((P / A) - (P * e * y_top / I) - (M * y_top / I))/1000
+    sigma_bot = ((P / A) - (P * e * y_bot / I) - (M * y_bot / I))/1000
 
     # -------- PLOT --------
     fig3 = go.Figure()
