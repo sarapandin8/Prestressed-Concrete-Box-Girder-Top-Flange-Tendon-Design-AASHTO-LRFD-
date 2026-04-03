@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 
 st.set_page_config(layout="wide")
 
-st.title("Prestressed Concrete Box Girder — Top Flange Tendon Design (Phase 1)")
+st.title("Prestressed Concrete Box Girder — Top Flange Tendon Design")
 
 # ==============================
 # INIT SESSION
@@ -39,68 +39,74 @@ if "df_load" not in st.session_state:
 # ==============================
 # TAB SETUP
 # ==============================
-tab1, tab2, tab3, tab4 = st.tabs(["Section", "Tendon", "Loads", "Visualization"])
+tab1, tab2 = st.tabs(["Section + Tendon", "Loads"])
 
 # ==============================
-# TAB 1: SECTION + PREVIEW
+# TAB 1: SECTION + TENDON + PREVIEW
 # ==============================
 with tab1:
-    st.header("Section Properties")
+    st.header("Section + Tendon Definition")
 
-    width = st.number_input("Top Flange Width (m)", value=6.0)
-    web_thickness = st.number_input("Web Thickness (m)", value=0.5)
+    col1, col2 = st.columns(2)
 
-    # -------- Thickness --------
-    st.subheader("Thickness Input")
-    df_thickness = st.data_editor(
-        st.session_state.df_thickness,
-        num_rows="dynamic",
-        key="thickness_editor"
-    )
+    with col1:
+        width = st.number_input("Top Flange Width (m)", value=6.0)
+        web_thickness = st.number_input("Web Thickness (m)", value=0.5)
 
-    # -------- Clean Thickness --------
-    df_thk = df_thickness.copy()
-    df_thk["Delete"] = df_thk["Delete"].fillna(False)
-    df_thk = df_thk[df_thk["Delete"] == False]
+        st.subheader("Thickness (Top Flange)")
 
-    df_thk["x (m)"] = pd.to_numeric(df_thk["x (m)"], errors='coerce')
-    df_thk["t (m)"] = pd.to_numeric(df_thk["t (m)"], errors='coerce')
+        df_thickness = st.data_editor(
+            st.session_state.df_thickness,
+            num_rows="dynamic",
+            key="thickness_editor"
+        )
 
-    df_thk = df_thk.dropna().sort_values("x (m)")
+        df_thk = df_thickness.copy()
+        df_thk["Delete"] = df_thk["Delete"].fillna(False)
+        df_thk = df_thk[df_thk["Delete"] == False]
 
-    # -------- Tendon --------
-    st.subheader("Tendon Profile")
-    df_tendon = st.data_editor(
-        st.session_state.df_tendon,
-        num_rows="dynamic",
-        key="tendon_editor"
-    )
+        df_thk["x (m)"] = pd.to_numeric(df_thk["x (m)"], errors='coerce')
+        df_thk["t (m)"] = pd.to_numeric(df_thk["t (m)"], errors='coerce')
 
-    # -------- Clean Tendon --------
-    df_tdn = df_tendon.copy()
-    df_tdn["Delete"] = df_tdn["Delete"].fillna(False)
-    df_tdn = df_tdn[df_tdn["Delete"] == False]
+        df_thk = df_thk.dropna().sort_values("x (m)")
 
-    df_tdn["x (m)"] = pd.to_numeric(df_tdn["x (m)"], errors='coerce')
-    df_tdn["z from top (m)"] = pd.to_numeric(df_tdn["z from top (m)"], errors='coerce')
+    with col2:
+        st.subheader("Tendon Profile")
 
-    df_tdn = df_tdn.dropna().sort_values("x (m)")
+        df_tendon = st.data_editor(
+            st.session_state.df_tendon,
+            num_rows="dynamic",
+            key="tendon_editor"
+        )
+
+        df_tdn = df_tendon.copy()
+        df_tdn["Delete"] = df_tdn["Delete"].fillna(False)
+        df_tdn = df_tdn[df_tdn["Delete"] == False]
+
+        df_tdn["x (m)"] = pd.to_numeric(df_tdn["x (m)"], errors='coerce')
+        df_tdn["z from top (m)"] = pd.to_numeric(df_tdn["z from top (m)"], errors='coerce')
+
+        df_tdn = df_tdn.dropna().sort_values("x (m)")
 
     # -------- PREVIEW --------
     st.subheader("🔍 Section + Tendon Preview")
 
     if len(df_thk) >= 2 and len(df_tdn) >= 2:
 
-        x = np.linspace(0, width, 300)
+        x = np.linspace(0, width, 400)
 
         t_interp = np.interp(x, df_thk["x (m)"], df_thk["t (m)"])
         z_interp = np.interp(x, df_tdn["x (m)"], df_tdn["z from top (m)"])
 
         fig = go.Figure()
 
+        # Top
         fig.add_trace(go.Scatter(x=x, y=np.zeros_like(x), name="Top Surface"))
+
+        # Bottom
         fig.add_trace(go.Scatter(x=x, y=-t_interp, name="Bottom Surface"))
 
+        # Tendon
         fig.add_trace(go.Scatter(
             x=x,
             y=-z_interp,
@@ -109,30 +115,24 @@ with tab1:
             line=dict(width=3)
         ))
 
+        # Web
         fig.add_vline(x=web_thickness/2)
         fig.add_vline(x=width - web_thickness/2)
 
         fig.update_layout(
-            title="Section + Tendon",
+            title="Top Flange Section + Tendon",
             yaxis_title="Depth (m)"
         )
 
         st.plotly_chart(fig, use_container_width=True)
 
     else:
-        st.info("Enter at least 2 valid points")
+        st.info("Enter at least 2 valid points for section and tendon")
 
 # ==============================
-# TAB 2: TENDON INFO
+# TAB 2: LOADS
 # ==============================
 with tab2:
-    st.header("Tendon Info")
-    st.write(df_tdn)
-
-# ==============================
-# TAB 3: LOADS
-# ==============================
-with tab3:
     st.header("Loads")
 
     df_load = st.data_editor(
@@ -141,7 +141,6 @@ with tab3:
         key="load_editor"
     )
 
-    # -------- Clean Load --------
     df_ld = df_load.copy()
     df_ld["Delete"] = df_ld["Delete"].fillna(False)
     df_ld = df_ld[df_ld["Delete"] == False]
@@ -153,7 +152,7 @@ with tab3:
 
     if len(df_ld) >= 2:
 
-        x_plot = np.linspace(0, width, 300)
+        x_plot = np.linspace(0, width, 400)
 
         Mu = (
             1.25*np.interp(x_plot, df_ld["x (m)"], df_ld["M_DL"]) +
@@ -167,7 +166,7 @@ with tab3:
             1.75*np.interp(x_plot, df_ld["x (m)"], df_ld["V_LL"])
         )
 
-        st.write("Strength I (AASHTO LRFD)")
+        st.subheader("Strength I — AASHTO LRFD")
         st.write("Mu = 1.25 DL + 1.50 SDL + 1.75 LL")
 
         fig = go.Figure()
@@ -178,10 +177,3 @@ with tab3:
 
     else:
         st.warning("Need at least 2 valid points")
-
-# ==============================
-# TAB 4
-# ==============================
-with tab4:
-    st.header("Visualization")
-    st.info("Use Section tab for preview")
