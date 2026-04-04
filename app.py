@@ -103,8 +103,8 @@ try:
     # Stress Function
     def get_stresses(P, M, e_val, t_val, I_val, A_val):
         f_axial = -(P/A_val)/1000
-        sig_P_top = f_axial + (P * e_val * (t_val/2) / I_val) / 1000
-        sig_P_bot = f_axial + (P * e_val * (-t_val/2) / I_val) / 1000
+        sig_P_top = f_axial + (P * e_val * (-t_val/2) / I_val) / 1000
+        sig_P_bot = f_axial + (P * e_val * (t_val/2) / I_val) / 1000
         sig_M_top = -(M * (t_val/2) / I_val) / 1000
         sig_M_bot = -(M * (-t_val/2) / I_val) / 1000
         return sig_P_top + sig_M_top, sig_P_bot + sig_M_bot
