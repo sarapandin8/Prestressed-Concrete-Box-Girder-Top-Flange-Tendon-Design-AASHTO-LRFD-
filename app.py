@@ -114,16 +114,16 @@ try:
 
     # --- STRESS ANALYSIS ---
     # Transfer Stage (Pi + M_DL)
-    sig_pi_top = -(pi_force/area)/1000 + (pi_force*ecc*(t/2)/inertia)/1000
-    sig_pi_bot = -(pi_force/area)/1000 + (pi_force*ecc*(-t/2)/inertia)/1000
+    sig_pi_top = -(pi_force/area)/1000 + (pi_force*ecc*(-t/2)/inertia)/1000
+    sig_pi_bot = -(pi_force/area)/1000 + (pi_force*ecc*(t/2)/inertia)/1000
     sig_mdl_top = -(m_dl*(t/2)/inertia)/1000
     sig_mdl_bot = -(m_dl*(-t/2)/inertia)/1000
     stress_trans_top = sig_pi_top + sig_mdl_top
     stress_trans_bot = sig_pi_bot + sig_mdl_bot
 
     # Service Stage (Pe + Ms1)
-    sig_pe_top = -(pe_force/area)/1000 + (pe_force*ecc*(t/2)/inertia)/1000
-    sig_pe_bot = -(pe_force/area)/1000 + (pe_force*ecc*(-t/2)/inertia)/1000
+    sig_pe_top = -(pe_force/area)/1000 + (pe_force*ecc*(-t/2)/inertia)/1000
+    sig_pe_bot = -(pe_force/area)/1000 + (pe_force*ecc*(t/2)/inertia)/1000
     sig_ms1_top = -(ms1*(t/2)/inertia)/1000
     sig_ms1_bot = -(ms1*(-t/2)/inertia)/1000
     stress_svc_top = sig_pe_top + sig_ms1_top
