@@ -2,6 +2,10 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+from docx import Document
+from docx.shared import Inches, Pt
+from io import BytesIO
+import datetime
 
 # ══════════════════════════════════════════════
 # 1. APP CONFIG & INITIALIZATION
@@ -50,6 +54,11 @@ with st.sidebar:
         phi_flex = st.number_input("φ Flexure", value=1.0)
         phi_shear = st.number_input("φ Shear", value=0.9)
 
+    st.markdown("---")
+    st.subheader("📄 Export Report")
+    proj_name = st.text_input("Project Name", "Bridge Lane Expansion")
+    eng_name = st.text_input("Engineer Name", "Your Name")
+
 # ══════════════════════════════════════════════
 # 3. MAIN INTERFACE - DATA EDITORS
 # ══════════════════════════════════════════════
@@ -66,7 +75,7 @@ with col_ed2:
     df_ld = st.data_editor(st.session_state.df_load, num_rows="dynamic", key="ed_ld")
 
 # ══════════════════════════════════════════════
-# 4. CALCULATION ENGINE
+# 4. CALCULATION ENGINE (Original Logic)
 # ══════════════════════════════════════════════
 def prepare_data(df):
     return df.dropna().sort_values("x (m)")
@@ -74,7 +83,6 @@ def prepare_data(df):
 try:
     dft, dfp, dfl = prepare_data(df_thk), prepare_data(df_tdn), prepare_data(df_ld)
 
-    # สร้าง Array 400 จุดเพื่อความละเอียดของกราฟ
     N = 400
     x_plot = np.linspace(0, width, N)
     
@@ -91,16 +99,13 @@ try:
     ms1 = m_dl + m_sdl + m_ll
     mu = 1.25 * m_dl + 1.50 * m_sdl + 1.75 * m_ll
 
-    # Section Properties (1m strip)
     area, inertia, yc = 1.0 * t, (1.0 * t**3) / 12, t / 2
     ecc = yc - z  # (+) Tendon Above CG, (-) Tendon Below CG
 
-    # Prestress Forces
     aps_total = (num_tendon * strands_per_tendon) * (aps_strand * 1e-6)
     pi_force = aps_total * (fpu * fpi_ratio * (1 - init_loss/100)) * 1e3
     pe_force = pi_force * eff_ratio
 
-    # Stress Function
     def get_stresses(P, M, e_val, t_val, I_val, A_val):
         f_axial = -(P/A_val)/1000
         sig_P_top = f_axial + (P * e_val * (-t_val/2) / I_val) / 1000
@@ -112,7 +117,6 @@ try:
     tr_top, tr_bot = get_stresses(pi_force, m_dl, ecc, t, inertia, area)
     sv_top, sv_bot = get_stresses(pe_force, ms1, ecc, t, inertia, area)
 
-    # Strength (Envelope)
     beta1 = np.clip(0.85 - 0.05*(fc - 28.0)/7.0, 0.65, 0.85)
     k_fact = 2.0 * (1.04 - fpy_ratio)
 
@@ -124,7 +128,60 @@ try:
     phi_mn_pos, phi_mn_neg = calc_phiMn(t - z), -calc_phiMn(z)
 
     # ══════════════════════════════════════════════
-    # 5. TABS & VISUALIZATION
+    # 🌟 NEW: WORD EXPORT LOGIC
+    # ══════════════════════════════════════════════
+    def generate_report():
+        doc = Document()
+        # Title
+        title = doc.add_heading('Structural Calculation Report', 0)
+        doc.add_paragraph(f"Project: {proj_name}")
+        doc.add_paragraph(f"Engineer: {eng_name}")
+        doc.add_paragraph(f"Date: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}")
+
+        # 1. Materials
+        doc.add_heading('1. Material Properties & Standard Reference', level=1)
+        doc.add_paragraph("Design Code: AASHTO LRFD Bridge Design Specifications", style='List Bullet')
+        doc.add_paragraph(f"Concrete Strength: fc' = {fc} MPa, fci' = {fci} MPa", style='List Bullet')
+        doc.add_paragraph(f"Prestressing Steel: fpu = {fpu} MPa (Low Relaxation Strands)", style='List Bullet')
+
+        # 2. Stress Limits
+        doc.add_heading('2. Allowable Stress Limits', level=1)
+        doc.add_paragraph(f"Transfer Stage (AASHTO 5.9.2.3.1): Compression {0.6*fci:.2f} MPa, Tension {0.25*np.sqrt(fci):.2f} MPa")
+        doc.add_paragraph(f"Service Stage (AASHTO 5.9.2.3.2): Compression {0.6*fc:.2f} MPa, Tension {0.50*np.sqrt(fc):.2f} MPa")
+
+        # 3. Strength Table
+        doc.add_heading('3. Strength and Stress Summary Table', level=1)
+        table = doc.add_table(rows=1, cols=6)
+        table.style = 'Table Grid'
+        hdr_cells = table.rows[0].cells
+        cols = ["X (m)", "Mu (kNm)", "phi*Mn", "DCR", "S-Top", "S-Bot"]
+        for i, name in enumerate(cols): hdr_cells[i].text = name
+
+        idx_report = [np.abs(x_plot - v).argmin() for v in dfl["x (m)"].values]
+        for i in idx_report:
+            row = table.add_row().cells
+            cap = phi_mn_pos[i] if mu[i] >= 0 else abs(phi_mn_neg[i])
+            row[0].text = f"{x_plot[i]:.2f}"
+            row[1].text = f"{mu[i]:.1f}"
+            row[2].text = f"{cap:.1f}"
+            row[3].text = f"{abs(mu[i])/cap:.3f}"
+            row[4].text = f"{sv_top[i]:.2f}"
+            row[5].text = f"{sv_bot[i]:.2f}"
+
+        buf = BytesIO()
+        doc.save(buf)
+        buf.seek(0)
+        return buf
+
+    st.sidebar.download_button(
+        label="📥 Download Word Report",
+        data=generate_report(),
+        file_name=f"Report_{proj_name}.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+
+    # ══════════════════════════════════════════════
+    # 5. TABS & VISUALIZATION (Original Logic)
     # ══════════════════════════════════════════════
     tabs = st.tabs(["📐 Geometry", "🚀 Transfer Stress", "⚖️ Service Stress", "💪 Flexure (Envelope)", "🔪 Shear"])
     idx = [np.abs(x_plot - v).argmin() for v in dfl["x (m)"].values]
