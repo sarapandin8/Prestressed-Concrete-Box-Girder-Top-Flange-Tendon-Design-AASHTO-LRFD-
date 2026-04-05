@@ -127,46 +127,109 @@ try:
 
     phi_mn_pos, phi_mn_neg = calc_phiMn(t - z), -calc_phiMn(z)
 
+ 
+   # ══════════════════════════════════════════════
+    # 🌟 NEW: FULL ENGINEERING REPORT EXPORT
     # ══════════════════════════════════════════════
-    # 🌟 NEW: WORD EXPORT LOGIC
-    # ══════════════════════════════════════════════
-    
     def generate_report():
         doc = Document()
-        doc.add_heading('Structural Calculation Report', 0)
         
-        # --- 1. PROJECT INFO ---
+        # ตั้งค่า Font พื้นฐาน
+        style = doc.styles['Normal']
+        style.font.name = 'Calibri'
+        style.font.size = Pt(10)
+
+        # --- HEADER ---
+        doc.add_heading('Structural Calculation Report (Detailed)', 0)
         p = doc.add_paragraph()
         p.add_run(f"Project: {proj_name}\n").bold = True
         p.add_run(f"Engineer: {eng_name}\nDate: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
-        # --- 2. INPUT DATA SUMMARY ---
-        doc.add_heading('1. Design Inputs & Material Properties', level=1)
-        doc.add_paragraph(f"Concrete: f'c = {fc} MPa, f'ci = {fci} MPa", style='List Bullet')
-        doc.add_paragraph(f"Prestressing: fpu = {fpu} MPa, {num_tendon} Tendons/m, {strands_per_tendon} Strands/Tendon", style='List Bullet')
+        # ==========================================
+        # 1. INPUT DATA SUMMARY
+        # ==========================================
+        doc.add_heading('1. Design Parameters & Input Data', level=1)
         
-        # ตาราง Load Stations
-        doc.add_heading('1.1 Load Station Data', level=2)
-        table_ld = doc.add_table(rows=1, cols=7)
-        table_ld.style = 'Table Grid'
-        for i, h in enumerate(["x (m)", "M_DL", "V_DL", "M_SDL", "V_SDL", "M_LL", "V_LL"]):
-            table_ld.rows[0].cells[i].text = h
-        for _, r in dfl.iterrows():
-            row_cells = table_ld.add_row().cells
-            for i, val in enumerate(r): row_cells[i].text = f"{val:.2f}"
+        doc.add_heading('1.1 Materials & Prestressing Parameters', level=2)
+        doc.add_paragraph(f"Concrete: f'c = {fc} MPa, f'ci = {fci} MPa", style='List Bullet')
+        doc.add_paragraph(f"Strands: {num_tendon} Tendons/m, {strands_per_tendon} Strands/Tendon, Area = {aps_strand} mm²/strand", style='List Bullet')
+        doc.add_paragraph(f"Prestress Force: Pi = {pi_force/1000:.1f} kN/m, Pe = {pe_force/1000:.1f} kN/m", style='List Bullet')
 
-        # --- 3. STEP-BY-STEP METHODOLOGY ---
-        doc.add_heading('2. Calculation Methodology (AASHTO LRFD)', level=1)
-        doc.add_paragraph("2.1 Transfer Stress: σ = -(Pi/A) ± (Pi*e*y/I) ± (M_DL*y/I)", style='List Bullet')
-        doc.add_paragraph("2.2 Service Stress: σ = -(Pe/A) ± (Pe*e*y/I) ± (M_Total*y/I)", style='List Bullet')
-        doc.add_paragraph("2.3 Flexural Strength: Nominal capacity based on AASHTO 5.6.3.1.1", style='List Bullet')
-        doc.add_paragraph("2.4 Shear Strength: Vc = 0.083 * β * sqrt(f'c) * bv * dv", style='List Bullet')
+        # ฟังก์ชันช่วยสร้างตารางใน Word
+        def add_df_to_word(df_input, title):
+            doc.add_heading(title, level=2)
+            t = doc.add_table(rows=1, cols=len(df_input.columns))
+            t.style = 'Table Grid'
+            for i, col_name in enumerate(df_input.columns):
+                t.rows[0].cells[i].text = str(col_name)
+            for _, row_data in df_input.iterrows():
+                row_cells = t.add_row().cells
+                for i, val in enumerate(row_data):
+                    row_cells[i].text = f"{val:.3f}"
 
-        # --- 4. DETAILED RESULTS TABLE ---
-        doc.add_heading('3. Detailed Analysis Results', level=1)
+        add_df_to_word(dft, '1.2 Geometry Profile (Thickness)')
+        add_df_to_word(dfp, '1.3 Tendon Profile (z from top)')
+        add_df_to_word(dfl, '1.4 Design Load Stations')
+
+        # ==========================================
+        # 2. STEP-BY-STEP SAMPLE CALCULATION
+        # ==========================================
+        doc.add_heading('2. Sample Calculation (Step-by-Step)', level=1)
+        
+        # ดึงจุดคำนวณตัวอย่างที่ x แรกสุด (Index 0)
+        idx_s = 0
+        x_s = dfl.iloc[idx_s]["x (m)"]
+        i_s = np.abs(x_plot - x_s).argmin() # หา index ใน array 400 จุด
+        
+        doc.add_paragraph(f"Sample calculation performed at section x = {x_s:.2f} m").bold = True
+        
+        doc.add_heading('Section Properties at Sample Point:', level=3)
+        doc.add_paragraph(f"Thickness (t) = {t[i_s]:.3f} m, Tendon Depth (z) = {z[i_s]:.3f} m")
+        doc.add_paragraph(f"Area (A) = 1.0 * t = {area[i_s]:.4f} m²")
+        doc.add_paragraph(f"Inertia (I) = (1.0 * t³) / 12 = {inertia[i_s]:.6f} m⁴")
+        doc.add_paragraph(f"Eccentricity (e) = (t/2) - z = {(t[i_s]/2):.3f} - {z[i_s]:.3f} = {ecc[i_s]:.3f} m")
+
+        # --- Transfer Stress ---
+        doc.add_heading('2.1 Transfer Stress (Pi + M_DL)', level=2)
+        doc.add_paragraph("Formula: σ = -(Pi/A) ± (Pi*e*y/I) ± (M_DL*y/I)")
+        doc.add_paragraph(f"M_DL = {m_dl[i_s]:.2f} kNm")
+        doc.add_paragraph(f"σ_top = -({pi_force/1000:.1f}/{area[i_s]:.3f}) + ({pi_force/1000:.1f}*{ecc[i_s]:.3f}*{-t[i_s]/2:.3f}/{inertia[i_s]:.5f}) - ({m_dl[i_s]:.1f}*{-t[i_s]/2:.3f}/{inertia[i_s]:.5f})")
+        doc.add_paragraph(f"σ_top = {tr_top[i_s]:.2f} MPa (Limit: {-0.6*fci:.1f} to {0.25*np.sqrt(fci):.2f})")
+        doc.add_paragraph(f"σ_bot = {tr_bot[i_s]:.2f} MPa")
+
+        # --- Service Stress ---
+        doc.add_heading('2.2 Service Stress (Pe + Ms1)', level=2)
+        doc.add_paragraph("Formula: σ = -(Pe/A) ± (Pe*e*y/I) ± (Ms1*y/I)")
+        doc.add_paragraph(f"Ms1 (Total Service Moment) = {ms1[i_s]:.2f} kNm")
+        doc.add_paragraph(f"σ_top = -({pe_force/1000:.1f}/{area[i_s]:.3f}) + ({pe_force/1000:.1f}*{ecc[i_s]:.3f}*{-t[i_s]/2:.3f}/{inertia[i_s]:.5f}) - ({ms1[i_s]:.1f}*{-t[i_s]/2:.3f}/{inertia[i_s]:.5f})")
+        doc.add_paragraph(f"σ_top = {sv_top[i_s]:.2f} MPa (Limit: {-0.6*fc:.1f} to {0.5*np.sqrt(fc):.2f})")
+        doc.add_paragraph(f"σ_bot = {sv_bot[i_s]:.2f} MPa")
+
+        # --- Flexural Strength ---
+        doc.add_heading('2.3 Flexural Strength (φMn)', level=2)
+        dp_s = t[i_s] - z[i_s] if mu[i_s] >= 0 else z[i_s]
+        cap_s = phi_mn_pos[i_s] if mu[i_s] >= 0 else abs(phi_mn_neg[i_s])
+        doc.add_paragraph("Formula: φMn = φ * Aps * fps * (dp - a/2)")
+        doc.add_paragraph(f"Mu Demand = {mu[i_s]:.2f} kNm, dp = {dp_s:.3f} m")
+        doc.add_paragraph(f"Calculated Nominal Capacity (φMn) = {cap_s:.2f} kNm")
+        doc.add_paragraph(f"DCR (Mu / φMn) = {abs(mu[i_s])/cap_s:.3f}")
+
+        # --- Shear Strength ---
+        doc.add_heading('2.4 Shear Strength Check (φVn)', level=2)
+        dv_s = max(0.9 * (t[i_s] - z[i_s]), 0.72 * t[i_s])
+        vn_s = phi_shear * (0.083 * 2.0 * 1.0 * np.sqrt(fc) * 1.0 * dv_s * 1000)
+        doc.add_paragraph("Formula: φVc = φ * 0.083 * β * sqrt(fc) * bv * dv")
+        doc.add_paragraph(f"Effective shear depth (dv) = {dv_s:.3f} m")
+        doc.add_paragraph(f"Calculated Capacity (φVn) = φ * 0.083 * 2.0 * sqrt({fc}) * 1.0 * {dv_s:.3f} = {vn_s:.2f} kN")
+        doc.add_paragraph(f"Vu Demand = {v_total[i_s]:.2f} kN --> DCR = {abs(v_total[i_s])/vn_s:.3f}")
+
+        # ==========================================
+        # 3. DETAILED RESULTS TABLE
+        # ==========================================
+        doc.add_heading('3. Summary Results at All Stations', level=1)
         res_table = doc.add_table(rows=1, cols=8)
         res_table.style = 'Table Grid'
-        res_headers = ["X (m)", "Mu (kNm)", "phi*Mn", "DCR", "S-Top", "S-Bot", "Vu (kN)", "phi*Vn"]
+        res_headers = ["X (m)", "Mu (kNm)", "phi*Mn", "Flx DCR", "S-Top(sv)", "S-Bot(sv)", "Vu (kN)", "Shear DCR"]
         for i, h in enumerate(res_headers): res_table.rows[0].cells[i].text = h
 
         idx_report = [np.abs(x_plot - v).argmin() for v in dfl["x (m)"].values]
@@ -183,25 +246,12 @@ try:
             row[4].text = f"{sv_top[i]:.2f}"
             row[5].text = f"{sv_bot[i]:.2f}"
             row[6].text = f"{abs(v_total[i]):.1f}"
-            row[7].text = f"{vn_val:.1f}"
+            row[7].text = f"{abs(v_total[i])/vn_val:.3f}"
 
         buf = BytesIO()
         doc.save(buf)
         buf.seek(0)
         return buf
-
-    # แยกส่วนแสดงปุ่มออกมาให้เห็นชัดเจนใน Sidebar
-    with st.sidebar:
-        st.markdown("---")
-        st.subheader("📄 Export Report")
-        if st.download_button(
-            label="📥 Download Detailed Report (.docx)",
-            data=generate_report(),
-            file_name=f"Report_{proj_name}.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        ):
-            st.success("Report generated successfully!")
-
 
     # ══════════════════════════════════════════════
     # 5. TABS & VISUALIZATION (Original Logic)
