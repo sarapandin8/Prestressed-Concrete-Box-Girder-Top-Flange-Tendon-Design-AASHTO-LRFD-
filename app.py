@@ -130,74 +130,49 @@ try:
     # ══════════════════════════════════════════════
     # 🌟 NEW: WORD EXPORT LOGIC
     # ══════════════════════════════════════════════
+    
     def generate_report():
         doc = Document()
-        
-        # ตั้งค่า Font พื้นฐาน (สำหรับเครื่องที่รองรับ)
-        style = doc.styles['Normal']
-        style.font.name = 'Calibri'
-        style.font.size = Pt(11)
-
-        # --- HEADER ---
         doc.add_heading('Structural Calculation Report', 0)
+        
+        # --- 1. PROJECT INFO ---
         p = doc.add_paragraph()
         p.add_run(f"Project: {proj_name}\n").bold = True
         p.add_run(f"Engineer: {eng_name}\nDate: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
-        # --- 1. INPUT DATA ---
-        doc.add_heading('1. Design Inputs', level=1)
-        
-        doc.add_heading('1.1 Materials & Geometry', level=2)
+        # --- 2. INPUT DATA SUMMARY ---
+        doc.add_heading('1. Design Inputs & Material Properties', level=1)
         doc.add_paragraph(f"Concrete: f'c = {fc} MPa, f'ci = {fci} MPa", style='List Bullet')
-        doc.add_paragraph(f"Prestressing: fpu = {fpu} MPa, Area/Strand = {aps_strand} mm²", style='List Bullet')
-        doc.add_paragraph(f"Configuration: {num_tendon} Tendons/m, {strands_per_tendon} Strands/Tendon", style='List Bullet')
-        doc.add_paragraph(f"Total Design Width: {width} m", style='List Bullet')
-
-        doc.add_heading('1.2 Applied Loads (Input Stations)', level=2)
+        doc.add_paragraph(f"Prestressing: fpu = {fpu} MPa, {num_tendon} Tendons/m, {strands_per_tendon} Strands/Tendon", style='List Bullet')
+        
+        # ตาราง Load Stations
+        doc.add_heading('1.1 Load Station Data', level=2)
         table_ld = doc.add_table(rows=1, cols=7)
         table_ld.style = 'Table Grid'
-        headers = ["x (m)", "M_DL", "V_DL", "M_SDL", "V_SDL", "M_LL", "V_LL"]
-        for i, h in enumerate(headers): table_ld.rows[0].cells[i].text = h
-        for _, row_data in dfl.iterrows():
+        for i, h in enumerate(["x (m)", "M_DL", "V_DL", "M_SDL", "V_SDL", "M_LL", "V_LL"]):
+            table_ld.rows[0].cells[i].text = h
+        for _, r in dfl.iterrows():
             row_cells = table_ld.add_row().cells
-            for i, val in enumerate(row_data): row_cells[i].text = f"{val:.2f}"
+            for i, val in enumerate(r): row_cells[i].text = f"{val:.2f}"
 
-        # --- 2. CALCULATION STEPS & METHODOLOGY ---
+        # --- 3. STEP-BY-STEP METHODOLOGY ---
         doc.add_heading('2. Calculation Methodology (AASHTO LRFD)', level=1)
-        
-        # 2.1 Transfer Stage
-        doc.add_heading('2.1 Transfer Stress Check', level=2)
-        doc.add_paragraph("Formula: σ = -(Pi/A) ± (Pi*e*y/I) ± (M_DL*y/I)")
-        doc.add_paragraph(f"Limit: Compression < {0.6*fci:.2f} MPa | Tension > {-0.25*np.sqrt(fci):.2f} MPa", style='Italic')
-        
-        # 2.2 Service Stage
-        doc.add_heading('2.2 Service Stress Check', level=2)
-        doc.add_paragraph("Formula: σ = -(Pe/A) ± (Pe*e*y/I) ± (M_Total*y/I)")
-        doc.add_paragraph(f"Limit: Compression < {0.6*fc:.2f} MPa | Tension > {-0.5*np.sqrt(fc):.2f} MPa", style='Italic')
+        doc.add_paragraph("2.1 Transfer Stress: σ = -(Pi/A) ± (Pi*e*y/I) ± (M_DL*y/I)", style='List Bullet')
+        doc.add_paragraph("2.2 Service Stress: σ = -(Pe/A) ± (Pe*e*y/I) ± (M_Total*y/I)", style='List Bullet')
+        doc.add_paragraph("2.3 Flexural Strength: Nominal capacity based on AASHTO 5.6.3.1.1", style='List Bullet')
+        doc.add_paragraph("2.4 Shear Strength: Vc = 0.083 * β * sqrt(f'c) * bv * dv", style='List Bullet')
 
-        # 2.3 Flexural Strength
-        doc.add_heading('2.3 Flexural Strength (Nominal Capacity)', level=2)
-        doc.add_paragraph("Using AASHTO LRFD 5.6.3.1.1 for Prestressing Steel Stress (fps):")
-        doc.add_paragraph("fps = fpu * (1 - k * c / dp)")
-        doc.add_paragraph(f"Resistance Factor (φ): {phi_flex}")
-
-        # 2.4 Shear Strength
-        doc.add_heading('2.4 Shear Capacity', level=2)
-        doc.add_paragraph("Vc = 0.083 * β * λ * sqrt(f'c) * bv * dv")
-        doc.add_paragraph(f"Resistance Factor (φ): {phi_shear}")
-
-        # --- 3. DETAILED RESULTS TABLE ---
+        # --- 4. DETAILED RESULTS TABLE ---
         doc.add_heading('3. Detailed Analysis Results', level=1)
         res_table = doc.add_table(rows=1, cols=8)
         res_table.style = 'Table Grid'
-        res_headers = ["X (m)", "Mu (kNm)", "phi*Mn", "DCR", "S-Top (sv)", "S-Bot (sv)", "Vu (kN)", "phi*Vn"]
+        res_headers = ["X (m)", "Mu (kNm)", "phi*Mn", "DCR", "S-Top", "S-Bot", "Vu (kN)", "phi*Vn"]
         for i, h in enumerate(res_headers): res_table.rows[0].cells[i].text = h
 
         idx_report = [np.abs(x_plot - v).argmin() for v in dfl["x (m)"].values]
         for i in idx_report:
             row = res_table.add_row().cells
             cap = phi_mn_pos[i] if mu[i] >= 0 else abs(phi_mn_neg[i])
-            # Shear Calculation for table
             dv_val = max(0.9*(t[i]-z[i]), 0.72*t[i])
             vn_val = phi_shear * (0.083 * 2.0 * 1.0 * np.sqrt(fc) * 1.0 * dv_val * 1000)
             
@@ -210,16 +185,23 @@ try:
             row[6].text = f"{abs(v_total[i]):.1f}"
             row[7].text = f"{vn_val:.1f}"
 
-        # --- 4. CONCLUSION ---
-        doc.add_heading('4. Summary & Conclusion', level=1)
-        max_dcr = max([abs(mu[i])/(phi_mn_pos[i] if mu[i]>=0 else abs(phi_mn_neg[i])) for i in idx_report])
-        status = "PASS" if max_dcr <= 1.0 else "FAIL"
-        doc.add_paragraph(f"The structural analysis for the specified top flange indicates a {status} status with a maximum Demand-Capacity Ratio (DCR) of {max_dcr:.3f}.")
-
         buf = BytesIO()
         doc.save(buf)
         buf.seek(0)
         return buf
+
+    # แยกส่วนแสดงปุ่มออกมาให้เห็นชัดเจนใน Sidebar
+    with st.sidebar:
+        st.markdown("---")
+        st.subheader("📄 Export Report")
+        if st.download_button(
+            label="📥 Download Detailed Report (.docx)",
+            data=generate_report(),
+            file_name=f"Report_{proj_name}.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ):
+            st.success("Report generated successfully!")
+
 
     # ══════════════════════════════════════════════
     # 5. TABS & VISUALIZATION (Original Logic)
