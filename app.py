@@ -52,14 +52,20 @@ DEFAULT_TABLES = dict(
     },
 )
 
-# ผูกค่าเริ่มต้นเข้า Session State (หากยังไม่มี)
+# ── Init scalars
 for k, v in DEFAULT_SCALARS.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-for k, v in DEFAULT_TABLES.items():
-    if k not in st.session_state:
-        st.session_state[k] = pd.DataFrame(v)
+# ── Init editor keys as single source of truth for table data
+# data_editor reads/writes via key → no separate df_thickness needed
+for tbl_key, editor_key in [
+    ("df_thickness", "ed_thk"),
+    ("df_tendon",    "ed_tdn"),
+    ("df_load",      "ed_ld"),
+]:
+    if editor_key not in st.session_state:
+        st.session_state[editor_key] = pd.DataFrame(DEFAULT_TABLES[tbl_key])
 
 if "_uploader_reset" not in st.session_state:
     st.session_state["_uploader_reset"] = 0
@@ -73,13 +79,13 @@ with st.sidebar:
     st.markdown("---")
     with st.expander("💾  Save  /  📂  Open Project", expanded=True):
 
-        # ── SAVE: ดึงข้อมูลล่าสุดจาก State เพื่อรับประกันว่าได้ค่าตารางที่แก้ไขล่าสุดเสมอ ──
+        # ── SAVE: read from editor key state (always current from previous rerun)
         _save_data = {
             "scalars": {k: st.session_state[k] for k in DEFAULT_SCALARS.keys()},
             "tables": {
-                "df_thickness": st.session_state.df_thickness.to_dict(orient="list"),
-                "df_tendon":    st.session_state.df_tendon.to_dict(orient="list"),
-                "df_load":      st.session_state.df_load.to_dict(orient="list"),
+                "df_thickness": st.session_state["ed_thk"].to_dict(orient="list"),
+                "df_tendon":    st.session_state["ed_tdn"].to_dict(orient="list"),
+                "df_load":      st.session_state["ed_ld"].to_dict(orient="list"),
             },
         }
         _json_bytes = json.dumps(_save_data, indent=2, ensure_ascii=False).encode("utf-8")
@@ -119,10 +125,20 @@ with st.sidebar:
                         else:
                             st.session_state[k] = str(v)
                             
-                # โหลด Tables
+                # โหลด Tables → อัปเดต editor keys โดยตรง
+                tbl_key_map = {
+                    "df_thickness": "ed_thk",
+                    "df_tendon":    "ed_tdn",
+                    "df_load":      "ed_ld",
+                }
                 for k, v in loaded.get("tables", {}).items():
-                    if k in DEFAULT_TABLES:
-                        st.session_state[k] = pd.DataFrame(v)
+                    if k in tbl_key_map:
+                        editor_key = tbl_key_map[k]
+                        new_df = pd.DataFrame(v)
+                        for col in new_df.columns:
+                            new_df[col] = pd.to_numeric(new_df[col], errors="coerce")
+                        # อัปเดต editor key state โดยตรง → data_editor จะแสดงค่าใหม่ทันที
+                        st.session_state[editor_key] = new_df
 
                 # ทำลาย Uploader ป้องกัน Loop
                 st.session_state["_uploader_reset"] += 1
@@ -189,37 +205,29 @@ st.caption("AASHTO LRFD  |  1.0 m transverse strip  |  "
 c1, c2 = st.columns(2)
 with c1:
     st.subheader("📏 Flange Thickness t(x)")
-    # data_editor syncs automatically via key — NO manual sync-back needed
-    # (writing back to session_state triggers extra rerun → requires 2 inputs)
-    df_thk = st.data_editor(st.session_state.df_thickness, num_rows="dynamic", key="ed_thk")
+    # Pass st.session_state["ed_thk"] as data AND key="ed_thk"
+    # → data_editor uses the SAME object as its source and target → no reset, no double-input
+    df_thk = st.data_editor(st.session_state["ed_thk"], num_rows="dynamic", key="ed_thk")
 
     st.subheader("🔩 Tendon Profile z(x)  [from top face]")
-    df_tdn = st.data_editor(st.session_state.df_tendon,    num_rows="dynamic", key="ed_tdn")
+    df_tdn = st.data_editor(st.session_state["ed_tdn"], num_rows="dynamic", key="ed_tdn")
 with c2:
     st.subheader("📦 Loads per 1 m strip")
-    df_ld  = st.data_editor(st.session_state.df_load,      num_rows="dynamic", key="ed_ld")
-
-# Sync to session_state ONCE using on_change-safe pattern
-# (read from editor output, not from session_state, to avoid write-back loop)
-st.session_state.df_thickness = df_thk
-st.session_state.df_tendon    = df_tdn
-st.session_state.df_load      = df_ld
+    df_ld  = st.data_editor(st.session_state["ed_ld"],  num_rows="dynamic", key="ed_ld")
+# No sync-back needed: data_editor writes directly to st.session_state["ed_thk"] etc.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 4.  CALCULATION ENGINE
 # ─────────────────────────────────────────────────────────────────────────────
 def prep(df):
-    """Clean dataframe: force numeric types, drop incomplete rows, sort by x."""
+    """Force all columns to float64 (handles dtype O from empty new rows), drop NaN rows."""
     df = df.copy()
-    # Force all columns to numeric — handles dtype('O') from partially-filled new rows
     for col in df.columns:
         df[col] = pd.to_numeric(df[col], errors="coerce")
-    # Drop rows where ANY cell is NaN (includes blank new rows)
     df = df.dropna()
     if df.empty:
         return df
-    df = df.sort_values("x (m)").drop_duplicates(subset="x (m)").reset_index(drop=True)
-    return df
+    return df.sort_values("x (m)").drop_duplicates(subset="x (m)").reset_index(drop=True)
 
 def run_calc(dft, dfp, dfl):
     """Run all calculations and return results dict."""
