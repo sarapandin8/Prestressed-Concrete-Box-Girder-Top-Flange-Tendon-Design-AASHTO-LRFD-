@@ -57,6 +57,14 @@ with st.sidebar:
 
     with st.expander("📐 Materials & Section", expanded=True):
         width       = st.number_input("Total Flange Width (m)",   value=6.0,    min_value=1.0)
+        st.markdown("**Web Centerline Positions**")
+        cl_lweb     = st.number_input("CL. L.Web  x from left (m)", value=1.50,
+                                      min_value=0.0, max_value=width,
+                                      help="Centerline of Left Web from left edge")
+        cl_rweb     = st.number_input("CL. R.Web  x from left (m)", value=4.50,
+                                      min_value=0.0, max_value=width,
+                                      help="Centerline of Right Web from left edge")
+        st.markdown("---")
         fc          = st.number_input("f'c  Service (MPa)",       value=40.0,   min_value=20.0)
         fci         = st.number_input("f'ci Transfer (MPa)",      value=30.0,   min_value=15.0)
         fpu         = st.number_input("fpu (MPa)",                value=1860.0)
@@ -816,34 +824,21 @@ try:
         cg_mm  = -R["yc"] * 1000.0
         tdn_mm = -R["z"] * 1000.0
 
-        # web face positions
-        web_left_face  = float(dft["x (m)"].min()) * 1000.0   # left edge = 0 mm
-        web_right_face = float(dft["x (m)"].max()) * 1000.0   # right edge = width mm
-        # inner web faces (cantilever start): use 15% and 85% of width as estimate
-        # user can override by ensuring df_thk has thicker edge points
-        t_max_mm = float(R["t"].max()) * 1000.0
-        t_min_mm = float(R["t"].min()) * 1000.0
+        # ── dimensions in mm ────────────────────────────────────────
+        t_max_mm   = float(R["t"].max()) * 1000.0
+        t_min_mm   = float(R["t"].min()) * 1000.0
+        width_mm   = width * 1000.0
+        cl_lweb_mm = cl_lweb * 1000.0   # user-defined CL. L.Web
+        cl_rweb_mm = cl_rweb * 1000.0   # user-defined CL. R.Web
 
-        # find x where thickness starts increasing from minimum → inner web face
-        t_arr = R["t"] * 1000.0
-        # left inner web face: first x from left where t > t_min + 10%*(t_max-t_min)
-        thresh = t_min_mm + 0.15 * (t_max_mm - t_min_mm)
-        idx_lweb = int(np.argmax(t_arr[:N//2] >= thresh))      # from left
-        idx_rweb = N - 1 - int(np.argmax(t_arr[N//2:][::-1] >= thresh))  # from right
-        x_lweb = float(x_mm[idx_lweb])
-        x_rweb = float(x_mm[idx_rweb])
-
-        # ── scaleratio: make thickness ≈ 1/10 of visual width ──────────
-        # yaxis scaleratio k means: 1 y-unit = k x-units on screen
-        # we want (t_max_mm * k) / (width_mm) ≈ 0.15  →  k = 0.15*width/t_max
-        width_mm  = width * 1000.0
-        scale_k   = max(1.0, round(0.15 * width_mm / t_max_mm))
-        y_margin  = t_max_mm * 1.8
-        y_range   = [-t_max_mm - y_margin, y_margin]
+        # ── scaleratio: thickness ≈ 15% of visual width ──────────────
+        scale_k  = max(1.0, round(0.15 * width_mm / t_max_mm))
+        y_margin = t_max_mm * 1.8
+        y_range  = [-t_max_mm - y_margin, y_margin]
 
         fig = go.Figure()
 
-        # Section fill (top → bottom)
+        # Section fill
         fig.add_trace(go.Scatter(
             x=np.concatenate([x_mm, x_mm[::-1]]),
             y=np.concatenate([top_mm, bot_mm[::-1]]),
@@ -854,7 +849,7 @@ try:
             hoverinfo="skip",
         ))
 
-        # CG line
+        # Section CG
         fig.add_trace(go.Scatter(
             x=x_mm, y=cg_mm,
             mode="lines",
@@ -871,62 +866,71 @@ try:
             name="Tendon CGS",
         ))
 
-        # Web face vertical lines
-        for x_wf, label, side in [
-            (x_lweb, "Face L.Web", "left"),
-            (x_rweb, "Face R.Web", "right"),
+        # ── Flange edges (Left & Right) — cyan dashed ──────────────
+        for x_edge, label, a_pos in [
+            (0.0,      "Edge L.Flange", "top right"),
+            (width_mm, "Edge R.Flange", "top left"),
+        ]:
+            fig.add_vline(
+                x=x_edge,
+                line=dict(color="rgba(0,170,170,0.85)", dash="dot", width=1.8),
+                annotation_text=f"<b>{label}</b>",
+                annotation_position=a_pos,
+                annotation_font=dict(size=10, color="rgba(0,150,150,1)"),
+            )
+
+        # ── Web centerlines (user-defined) — orange dashed ─────────
+        for x_wf, label, a_pos in [
+            (cl_lweb_mm, "CL. L.Web", "top right"),
+            (cl_rweb_mm, "CL. R.Web", "top left"),
         ]:
             fig.add_vline(
                 x=x_wf,
-                line=dict(color="rgba(180,120,0,0.8)", dash="dash", width=1.5),
-                annotation_text=label,
-                annotation_position="top",
-                annotation_font=dict(size=11, color="rgba(180,120,0,1)"),
+                line=dict(color="rgba(200,100,0,0.9)", dash="dash", width=2.0),
+                annotation_text=f"<b>{label}</b>",
+                annotation_position=a_pos,
+                annotation_font=dict(size=10, color="rgba(200,100,0,1)"),
             )
 
-        # Outer edge lines (cyan dashed — edge of cantilever)
-        for x_edge in [0.0, width_mm]:
-            fig.add_vline(
-                x=x_edge,
-                line=dict(color="rgba(0,180,180,0.6)", dash="dot", width=1.2),
-            )
-
-        # Station labels on x-axis (from load table)
-        for xi_m, label in zip(sta_x,
-            ["Sec B (L)", "Sec A (L)", "Sec A (R)", "Sec B (R)"]
-            if len(sta_x) == 4 else [f"x={v:.1f}m" for v in sta_x]):
+        # ── Station x-labels ────────────────────────────────────────
+        default_labels = (["Sec B (L)", "Sec A (L)", "Sec A (R)", "Sec B (R)"]
+                          if len(sta_x) == 4
+                          else [f"x={v:.1f}m" for v in sta_x])
+        for xi_m, lbl in zip(sta_x, default_labels):
             fig.add_annotation(
-                x=xi_m*1000, y=y_range[0]*0.85,
-                text=label, showarrow=False,
+                x=xi_m*1000, y=y_range[0]*0.82,
+                text=lbl, showarrow=False,
                 font=dict(size=9, color="gray"),
                 xanchor="center",
             )
 
         fig.update_layout(
+            title="Top Flange Cross-Section with Tendon Layout",
             height=420,
             xaxis=dict(
                 title="Distance from Left Edge (mm)",
-                range=[-width_mm*0.03, width_mm*1.03],
+                range=[-width_mm*0.04, width_mm*1.04],
                 showgrid=True, gridcolor="rgba(200,200,200,0.4)",
             ),
             yaxis=dict(
                 title="Depth (mm)",
                 range=y_range,
                 showgrid=True, gridcolor="rgba(200,200,200,0.4)",
-                # ── KEY: fix visual aspect ratio ──────────────────────
                 scaleanchor="x",
                 scaleratio=scale_k,
                 constrain="domain",
             ),
             legend=dict(orientation="h", y=-0.18),
             plot_bgcolor="white",
-            margin=dict(t=40, b=80),
+            margin=dict(t=50, b=80),
         )
 
         st.plotly_chart(fig, use_container_width=True)
-        st.caption(f"Scale ratio y:x = 1:{scale_k}  |  "
-                   f"t_min = {t_min_mm:.0f} mm  |  t_max = {t_max_mm:.0f} mm  |  "
-                   f"Width = {width_mm:.0f} mm")
+        col_inf1, col_inf2, col_inf3, col_inf4 = st.columns(4)
+        col_inf1.info(f"Scale y:x = 1:{int(scale_k)}")
+        col_inf2.info(f"t_min = {t_min_mm:.0f} mm")
+        col_inf3.info(f"CL.L.Web = {cl_lweb*1000:.0f} mm")
+        col_inf4.info(f"CL.R.Web = {cl_rweb*1000:.0f} mm")
 
         c1, c2, c3 = st.columns(3)
         c1.metric("Aps (1m strip)", f"{R['Aps']*1e6:.2f} mm²")
