@@ -188,9 +188,16 @@ st.caption("AASHTO LRFD  |  1.0 m transverse strip  |  "
 
 c1, c2 = st.columns(2)
 with c1:
-    st.subheader("📏 Flange Thickness t(x)")
-    df_thk = st.data_editor(st.session_state.df_thickness, num_rows="dynamic", key="ed_thk")
-    st.session_state.df_thickness = df_thk  # ซิงค์กลับทันทีเพื่อให้ Save ได้ตารางใหม่
+    # ค้นหาจุดที่แสดงตาราง Thickness แล้วแก้ไขเป็น:
+    st.subheader("1) Flange Thickness t(x)")
+          # รับค่าจากการ Edit และอัปเดตกลับเข้า session_state ทันที
+     edited_dft = st.data_editor(
+         st.session_state["dft"], 
+    num_rows="dynamic", 
+    key="dft_editor", # ใส่ key เพื่อให้ Streamlit ติดตามสถานะได้ดีขึ้น
+    use_container_width=True
+)
+st.session_state["dft"] = edited_dft # อัปเดตค่ากลับเข้า State ทันที
     
     st.subheader("🔩 Tendon Profile z(x)  [from top face]")
     df_tdn = st.data_editor(st.session_state.df_tendon,    num_rows="dynamic", key="ed_tdn")
@@ -207,12 +214,20 @@ def prep(df):
     return df.dropna().sort_values("x (m)").reset_index(drop=True)
 
 def run_calc(dft, dfp, dfl):
+    # --- เพิ่มส่วนนี้เพื่อ Fix Error dtype('O') ---
+    # บังคับให้เป็นตัวเลข ถ้าไม่ใช่เลขจะกลายเป็น NaN และลบแถวที่มี NaN ออก
+    dft = dft.apply(pd.to_numeric, errors='coerce').dropna()
+    dfp = dfp.apply(pd.to_numeric, errors='coerce').dropna()
+    dfl = dfl.apply(pd.to_numeric, errors='coerce').dropna()
+    # -------------------------------------------
+
+
     """Run all calculations and return results dict."""
     N = 500; b = 1.0
-    x = np.linspace(0, width, N)
+    x = np.linspace(0, s_width, 101)
 
     # Geometry
-    t  = np.interp(x, dft["x (m)"], dft["t (m)"])
+    t = np.interp(x, dft["x (m)"], dft["t (m)"]) # ตอนนี้จะไม่ Error แล้ว
     z  = np.interp(x, dfp["x (m)"], dfp["z_top (m)"])
     yc = t / 2.0
 
