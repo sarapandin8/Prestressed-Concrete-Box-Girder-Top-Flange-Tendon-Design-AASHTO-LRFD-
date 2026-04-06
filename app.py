@@ -107,8 +107,9 @@ with st.sidebar:
                 st.error(f"Load error: {e}")
 
         st.markdown("---")
-        st.caption("💾  **Save As** — กดปุ่มด้านล่าง browser จะเปิด dialog ให้เลือก folder ได้เลย")
-        _save_slot = st.empty()   # render download_button ที่นี่หลัง widget พร้อมแล้ว
+        # SAVE FILE — build JSON from current state
+        # (scalars read from session after all widgets are defined — placeholder here)
+        st.session_state["_save_trigger"] = st.button("💾  Save Current Project")
 
     # ── 📐 Materials & Section ───────────────────────────────────────────────
     with st.expander("📐 Materials & Section", expanded=True):
@@ -156,36 +157,36 @@ with st.sidebar:
     eng_name  = st.text_input("Prepared by",   value=str(_sv("eng_name")))
     chk_name  = st.text_input("Checked by",    value=str(_sv("chk_name")))
 
-    # ── Build save JSON from ALL current widgets (single-step Save As) ─────
-    _save_data = {
-        "scalars": {
-            "width": width, "cl_lweb": cl_lweb, "cl_rweb": cl_rweb,
-            "fc": fc, "fci": fci, "fpu": fpu, "fpy_ratio": fpy_ratio,
-            "aps_strand": aps_strand, "duct_dia_mm": duct_dia_mm,
-            "num_tendon": int(num_tendon), "n_strands": int(n_strands),
-            "fpi_ratio": float(fpi_ratio), "init_loss_pct": int(init_loss_pct),
-            "eff_ratio": float(eff_ratio),
-            "phi_flex": float(phi_flex), "phi_shear": float(phi_shear),
-            "proj_name": proj_name, "doc_no": doc_no,
-            "eng_name": eng_name, "chk_name": chk_name,
-        },
-        "tables": {
-            "df_thickness": st.session_state.df_thickness.to_dict(orient="list"),
-            "df_tendon":    st.session_state.df_tendon.to_dict(orient="list"),
-            "df_load":      st.session_state.df_load.to_dict(orient="list"),
-        },
-    }
-    _json_bytes = json.dumps(_save_data, indent=2, ensure_ascii=False).encode("utf-8")
-    _fname = f"{proj_name.replace(' ','_')}_{doc_no}.json"
-    # Render the single Save As button inside the placeholder defined earlier
-    _save_slot.download_button(
-        label="💾  Save As  (เลือก folder ใน browser)",
-        data=_json_bytes,
-        file_name=_fname,
-        mime="application/json",
-        key="dl_json",
-        use_container_width=True,
-    )
+    # ── Handle Save button (after all widgets so values are current) ──────────
+    if st.session_state.get("_save_trigger"):
+        save_data = {
+            "scalars": {
+                "width": width, "cl_lweb": cl_lweb, "cl_rweb": cl_rweb,
+                "fc": fc, "fci": fci, "fpu": fpu, "fpy_ratio": fpy_ratio,
+                "aps_strand": aps_strand, "duct_dia_mm": duct_dia_mm,
+                "num_tendon": int(num_tendon), "n_strands": int(n_strands),
+                "fpi_ratio": fpi_ratio, "init_loss_pct": int(init_loss_pct),
+                "eff_ratio": eff_ratio,
+                "phi_flex": phi_flex, "phi_shear": phi_shear,
+                "proj_name": proj_name, "doc_no": doc_no,
+                "eng_name": eng_name, "chk_name": chk_name,
+            },
+            "tables": {
+                "df_thickness": st.session_state.df_thickness.to_dict(orient="list"),
+                "df_tendon":    st.session_state.df_tendon.to_dict(orient="list"),
+                "df_load":      st.session_state.df_load.to_dict(orient="list"),
+            },
+        }
+        json_bytes = json.dumps(save_data, indent=2, ensure_ascii=False).encode("utf-8")
+        fname = f"{proj_name.replace(' ','_')}_{doc_no}.json"
+        # show inline download button
+        st.sidebar.download_button(
+            label="⬇️  Click to download",
+            data=json_bytes,
+            file_name=fname,
+            mime="application/json",
+            key="dl_json",
+        )
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 3.  DATA EDITORS  (always shown — outside try block)
