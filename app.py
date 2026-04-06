@@ -189,22 +189,37 @@ st.caption("AASHTO LRFD  |  1.0 m transverse strip  |  "
 c1, c2 = st.columns(2)
 with c1:
     st.subheader("📏 Flange Thickness t(x)")
+    # data_editor syncs automatically via key — NO manual sync-back needed
+    # (writing back to session_state triggers extra rerun → requires 2 inputs)
     df_thk = st.data_editor(st.session_state.df_thickness, num_rows="dynamic", key="ed_thk")
-    st.session_state.df_thickness = df_thk  # ซิงค์กลับทันทีเพื่อให้ Save ได้ตารางใหม่
-    
+
     st.subheader("🔩 Tendon Profile z(x)  [from top face]")
     df_tdn = st.data_editor(st.session_state.df_tendon,    num_rows="dynamic", key="ed_tdn")
-    st.session_state.df_tendon = df_tdn     # ซิงค์กลับทันที
 with c2:
     st.subheader("📦 Loads per 1 m strip")
     df_ld  = st.data_editor(st.session_state.df_load,      num_rows="dynamic", key="ed_ld")
-    st.session_state.df_load = df_ld        # ซิงค์กลับทันที
+
+# Sync to session_state ONCE using on_change-safe pattern
+# (read from editor output, not from session_state, to avoid write-back loop)
+st.session_state.df_thickness = df_thk
+st.session_state.df_tendon    = df_tdn
+st.session_state.df_load      = df_ld
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 4.  CALCULATION ENGINE
 # ─────────────────────────────────────────────────────────────────────────────
 def prep(df):
-    return df.dropna().sort_values("x (m)").reset_index(drop=True)
+    """Clean dataframe: force numeric types, drop incomplete rows, sort by x."""
+    df = df.copy()
+    # Force all columns to numeric — handles dtype('O') from partially-filled new rows
+    for col in df.columns:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    # Drop rows where ANY cell is NaN (includes blank new rows)
+    df = df.dropna()
+    if df.empty:
+        return df
+    df = df.sort_values("x (m)").drop_duplicates(subset="x (m)").reset_index(drop=True)
+    return df
 
 def run_calc(dft, dfp, dfl):
     """Run all calculations and return results dict."""
