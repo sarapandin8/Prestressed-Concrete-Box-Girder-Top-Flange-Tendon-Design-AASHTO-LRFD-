@@ -69,67 +69,31 @@ if "_uploader_reset" not in st.session_state:
 # 2.  SIDEBAR (Native State Binding)
 # ─────────────────────────────────────────────────────────────────────────────
 with st.sidebar:
-        # ── 💾 SAVE / 📂 OPEN ────────────────────────────────────────────────────
-    st.markdown("---")
-    with st.expander("💾  Save  /  📂  Open Project", expanded=True):
-
-        # ── SAVE: ดึงข้อมูลล่าสุดจาก State เพื่อรับประกันว่าได้ค่าตารางที่แก้ไขล่าสุดเสมอ ──
-        _save_data = {
-            "scalars": {k: st.session_state[k] for k in DEFAULT_SCALARS.keys()},
-            "tables": {
-                "df_thickness": st.session_state.df_thickness.to_dict(orient="list"),
-                "df_tendon":    st.session_state.df_tendon.to_dict(orient="list"),
-                "df_load":      st.session_state.df_load.to_dict(orient="list"),
-            },
-        }
-        _json_bytes = json.dumps(_save_data, indent=2, ensure_ascii=False).encode("utf-8")
-        _fname = f"{st.session_state.proj_name.replace(' ','_')}_{st.session_state.doc_no}.json"
-
-        st.download_button(
-            label="💾  Save Project  (.json)",
-            data=_json_bytes,
-            file_name=_fname,
-            mime="application/json",
-            use_container_width=True,
-        )
-        st.caption("ตั้ง Chrome: Settings→Downloads→'Ask where to save' เพื่อเลือก folder เอง")
-        st.markdown("---")
-
-        # ── OPEN: โหลดและจัดระเบียบ Type ป้องกัน Slider/Number_input Crash ──
+   # 1. ย้ายส่วน Open Project มาไว้บนสุด (เพื่อให้โหลดค่าก่อนสร้าง Widget)
+    with st.expander("📂 Open Project", expanded=True):
         _up_key = f"uploader_{st.session_state['_uploader_reset']}"
         uploaded_file = st.file_uploader(
-            "📂  Open Project  (.json)",
+            "เลือกไฟล์ .json ที่เคย Save ไว้",
             type="json",
             key=_up_key,
-            help="เลือกไฟล์ .json ที่เคย Save ไว้",
         )
-        
         if uploaded_file is not None:
             try:
                 loaded = json.loads(uploaded_file.read().decode("utf-8"))
-                
-                # โหลด Scalars พร้อมจับคู่ Type
-                for k, v in loaded.get("scalars", {}).items():
-                    if k in DEFAULT_SCALARS:
-                        def_val = DEFAULT_SCALARS[k]
-                        if isinstance(def_val, int):
-                            st.session_state[k] = int(v)
-                        elif isinstance(def_val, float):
-                            st.session_state[k] = float(v)
-                        else:
-                            st.session_state[k] = str(v)
-                            
-                # โหลด Tables
-                for k, v in loaded.get("tables", {}).items():
-                    if k in DEFAULT_TABLES:
-                        st.session_state[k] = pd.DataFrame(v)
-
-                # ทำลาย Uploader ป้องกัน Loop
+                apply_state(loaded) # อัปเดตค่าเข้า session_state
                 st.session_state["_uploader_reset"] += 1
-                st.success("✅  Project loaded successfully!")
-                st.rerun()
+                st.success("✅ Project loaded!")
+                st.rerun() # บังคับให้โปรแกรมรันใหม่เพื่อใช้ค่าที่โหลดมาทันที
             except Exception as e:
-                st.error(f"❌  Load error: {e}")
+                st.error(f"❌ Load error: {e}")
+
+    st.markdown("---")
+    st.header("⚙️ Design Parameters")
+
+    # 2. ส่วนของตัวกรอกข้อมูล (Widgets) ต่างๆ จะอยู่ต่อจากนี้...
+    # (วัสดุ, หน้าตัด, แรงดึง ฯลฯ)
+    with st.expander("📐 Materials & Section", expanded=True):
+        width = st.number_input("Total Flange Width (m)", value=float(_sv("width")), min_value=1.0)
 
 
         st.header("⚙️ Design Parameters")
