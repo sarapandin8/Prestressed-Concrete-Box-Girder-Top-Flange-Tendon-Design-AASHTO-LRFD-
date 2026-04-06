@@ -144,16 +144,25 @@ with st.sidebar:
                             
                 # โหลด Tables → อัปเดต src keys + ลบ editor keys ให้ reinit
                 _load_map = {"df_thickness":"thk_src","df_tendon":"tdn_src","df_load":"ld_src"}
+                loaded_tables = loaded.get("tables", {})
                 for tbl_key, src_key in _load_map.items():
-                    if tbl_key in loaded.get("tables", {}):
-                        new_df = pd.DataFrame(loaded["tables"][tbl_key])
-                        for col in new_df.columns:
-                            new_df[col] = pd.to_numeric(new_df[col], errors="coerce")
-                        st.session_state[src_key] = new_df
-                # ลบ editor key state → data_editor จะ reinit จาก src บน rerun ถัดไป
+                    if tbl_key in loaded_tables:
+                        # ตรวจสอบว่าข้อมูลในตารางไม่ว่างเปล่า
+                        table_data = loaded_tables[tbl_key]
+                        if table_data:
+                            new_df = pd.DataFrame(table_data)
+                            for col in new_df.columns:
+                                new_df[col] = pd.to_numeric(new_df[col], errors="coerce")
+                            st.session_state[src_key] = new_df
+                
+                # ลบ editor key state และข้อมูลที่แก้ไขค้างไว้ เพื่อให้ data_editor ดึงค่าใหม่จาก src_key
                 for ek in ["ed_thk", "ed_tdn", "ed_ld"]:
                     if ek in st.session_state:
                         del st.session_state[ek]
+                    # ลบข้อมูลที่ Streamlit เก็บไว้ใน widget state ภายใน (ถ้ามี)
+                    internal_key = f"{ek}_editor_state"
+                    if internal_key in st.session_state:
+                        del st.session_state[internal_key]
 
                 # ทำลาย Uploader ป้องกัน Loop
                 st.session_state["_uploader_reset"] += 1
