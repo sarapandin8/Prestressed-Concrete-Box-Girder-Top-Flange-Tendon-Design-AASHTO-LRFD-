@@ -8,6 +8,7 @@ Fixes applied:
            so tabs always render even if report fails
   [BUG-C] dp_neg = t−z  (hogging, compression face = BOTTOM)
   [BUG-D] Vu uses factored shear magnitudes
+  [FIX-STATE] Robust Streamlit Session State binding for Save/Load (Prevent Rerun Loops)
 """
 
 import math, datetime, json
@@ -23,7 +24,7 @@ from docx.shared import Inches, Pt, RGBColor, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 1.  CONFIG & SESSION STATE
+# 1.  CONFIG & SESSION STATE INITIALIZATION
 # ─────────────────────────────────────────────────────────────────────────────
 st.set_page_config(layout="wide", page_title="PSC Box Girder — Top Flange Design")
 
@@ -51,145 +52,137 @@ DEFAULT_TABLES = dict(
     },
 )
 
-def init_df(key, data):
-    if key not in st.session_state:
-        st.session_state[key] = pd.DataFrame(data)
+# ผูกค่าเริ่มต้นเข้า Session State (หากยังไม่มี)
+for k, v in DEFAULT_SCALARS.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
 
 for k, v in DEFAULT_TABLES.items():
-    init_df(k, v)
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 2.  SIDEBAR
-# ─────────────────────────────────────────────────────────────────────────────
-
-# ── helper: collect ALL current inputs into a JSON-serialisable dict ──────────
-def collect_state(sb):
-    """Gather sidebar scalars + table DataFrames into a plain dict."""
-    return {
-        "scalars": {k: sb.get(k) for k in DEFAULT_SCALARS},
-        "tables": {
-            "df_thickness": st.session_state.df_thickness.to_dict(orient="list"),
-            "df_tendon":    st.session_state.df_tendon.to_dict(orient="list"),
-            "df_load":      st.session_state.df_load.to_dict(orient="list"),
-        },
-    }
-
-def apply_state(data: dict):
-    """Push loaded JSON data into session state."""
-    for k, v in data.get("scalars", {}).items():
-        st.session_state[f"_load_{k}"] = v
-    for k, v in data.get("tables", {}).items():
+    if k not in st.session_state:
         st.session_state[k] = pd.DataFrame(v)
 
-# Sidebar scalars (loaded values override defaults if present)
-def _sv(key):
-    load_key = f"_load_{key}"
-    return st.session_state.get(load_key, DEFAULT_SCALARS[key])
+if "_uploader_reset" not in st.session_state:
+    st.session_state["_uploader_reset"] = 0
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 2.  SIDEBAR (Native State Binding)
+# ─────────────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.header("⚙️ Design Parameters")
 
-    # ── 💾 SAVE / 📂 OPEN ─────────────────────────────────────────────────────
-    with st.expander("💾  Save / 📂  Open Project", expanded=True):
-        st.caption("Save all inputs to a .json file, or open a previously saved file.")
-
-        # OPEN FILE
-        uploaded_file = st.file_uploader("📂  Open Project File (.json)",
-                                          type="json", key="file_uploader",
-                                          label_visibility="collapsed")
-        if uploaded_file is not None:
-            try:
-                loaded = json.loads(uploaded_file.read().decode("utf-8"))
-                apply_state(loaded)
-                st.success("✅  Project loaded successfully!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Load error: {e}")
-
-        st.markdown("---")
-        # SAVE FILE — build JSON from current state
-        # (scalars read from session after all widgets are defined — placeholder here)
-        st.session_state["_save_trigger"] = st.button("💾  Save Current Project")
-
     # ── 📐 Materials & Section ───────────────────────────────────────────────
     with st.expander("📐 Materials & Section", expanded=True):
-        width       = st.number_input("Total Flange Width (m)",   value=float(_sv("width")),    min_value=1.0)
-        fc          = st.number_input("f'c  Service (MPa)",       value=float(_sv("fc")),       min_value=20.0)
-        fci         = st.number_input("f'ci Transfer (MPa)",      value=float(_sv("fci")),      min_value=15.0)
-        fpu         = st.number_input("fpu (MPa)",                value=float(_sv("fpu")))
-        fpy_ratio   = st.selectbox("fpy/fpu",  [0.90, 0.85],
-                                   index=0 if _sv("fpy_ratio")==0.90 else 1,
-                                   help="Low-relaxation=0.90  |  Stress-relieved=0.85")
-        aps_strand  = st.number_input("Aps per strand (mm²)",     value=float(_sv("aps_strand")))
-        duct_dia_mm = st.number_input("Duct diameter (mm)",       value=float(_sv("duct_dia_mm")), min_value=20.0)
+        # ใช้ key=... อย่างเดียว Streamlit จะซิงค์ค่าให้เอง และไม่ค้างตอนโหลด
+        width       = st.number_input("Total Flange Width (m)",   min_value=1.0, key="width")
+        fc          = st.number_input("f'c  Service (MPa)",       min_value=20.0, key="fc")
+        fci         = st.number_input("f'ci Transfer (MPa)",      min_value=15.0, key="fci")
+        fpu         = st.number_input("fpu (MPa)",                key="fpu")
+        
+        # Selectbox logic
+        fpy_opts = [0.90, 0.85]
+        if st.session_state.fpy_ratio not in fpy_opts:
+            st.session_state.fpy_ratio = 0.90
+        fpy_ratio   = st.selectbox("fpy/fpu", fpy_opts, key="fpy_ratio", help="Low-relaxation=0.90  |  Stress-relieved=0.85")
+        
+        aps_strand  = st.number_input("Aps per strand (mm²)",     key="aps_strand")
+        duct_dia_mm = st.number_input("Duct diameter (mm)",       min_value=20.0, key="duct_dia_mm")
 
     # ── 🌐 Web Geometry ──────────────────────────────────────────────────────
     with st.expander("🌐  Web Geometry", expanded=True):
-        st.caption("Enter centerline positions of Left and Right webs measured from the left flange edge.")
+        st.caption("ระบุตำแหน่ง Centerline ของ Web ซ้าย-ขวา จากขอบซ้ายของ Flange")
         col_wl, col_wr = st.columns(2)
-        cl_lweb = col_wl.number_input("CL. L.Web (m)", value=float(_sv("cl_lweb")),
-                                       min_value=0.0, max_value=width, step=0.05,
-                                       help="Centerline of Left Web from left edge")
-        cl_rweb = col_wr.number_input("CL. R.Web (m)", value=float(_sv("cl_rweb")),
-                                       min_value=0.0, max_value=width, step=0.05,
-                                       help="Centerline of Right Web from left edge")
-        st.info(f"CL. L.Web = **{cl_lweb*1000:.0f} mm**  |  CL. R.Web = **{cl_rweb*1000:.0f} mm**  |  "
-                f"Span between webs = **{(cl_rweb-cl_lweb)*1000:.0f} mm**")
+        cl_lweb = col_wl.number_input("CL. L.Web (m)", min_value=0.0, step=0.05, key="cl_lweb")
+        cl_rweb = col_wr.number_input("CL. R.Web (m)", min_value=0.0, step=0.05, key="cl_rweb")
+        st.info(f"CL.L.Web = **{cl_lweb*1000:.0f} mm** |  "
+                f"CL.R.Web = **{cl_rweb*1000:.0f} mm** |  "
+                f"Span = **{(cl_rweb-cl_lweb)*1000:.0f} mm**")
 
     # ── 🔩 Prestressing Force ────────────────────────────────────────────────
     with st.expander("🔩 Prestressing Force", expanded=True):
-        num_tendon    = st.number_input("Tendons per 1 m strip",  value=int(_sv("num_tendon")),  min_value=1)
-        n_strands     = st.number_input("Strands per tendon",     value=int(_sv("n_strands")),   min_value=1)
-        fpi_ratio     = st.slider("fpi / fpu  (at jacking)",     0.70, 0.80, float(_sv("fpi_ratio")))
-        init_loss_pct = st.slider("Immediate loss at Transfer (%)", 0, 15, int(_sv("init_loss_pct")))
-        eff_ratio     = st.slider("Pe / Pi  (long-term ratio)",  0.50, 0.95, float(_sv("eff_ratio")))
+        num_tendon    = st.number_input("Tendons per 1 m strip",  min_value=1, key="num_tendon")
+        n_strands     = st.number_input("Strands per tendon",     min_value=1, key="n_strands")
+        fpi_ratio     = st.slider("fpi / fpu  (at jacking)",     0.70, 0.80, key="fpi_ratio")
+        init_loss_pct = st.slider("Immediate loss at Transfer (%)", 0, 15, key="init_loss_pct")
+        eff_ratio     = st.slider("Pe / Pi  (long-term ratio)",  0.50, 0.95, key="eff_ratio")
 
     # ── ⚖️ Resistance Factors ────────────────────────────────────────────────
     with st.expander("⚖️ Resistance Factors φ"):
-        phi_flex  = st.number_input("φ  Flexure", value=float(_sv("phi_flex")),  min_value=0.75, max_value=1.00)
-        phi_shear = st.number_input("φ  Shear",   value=float(_sv("phi_shear")), min_value=0.70, max_value=1.00)
+        phi_flex  = st.number_input("φ  Flexure", min_value=0.75, max_value=1.00, key="phi_flex")
+        phi_shear = st.number_input("φ  Shear",   min_value=0.70, max_value=1.00, key="phi_shear")
 
     # ── 📄 Report Info ────────────────────────────────────────────────────────
     st.markdown("---")
     st.subheader("📄 Report Information")
-    proj_name = st.text_input("Project Name",  value=str(_sv("proj_name")))
-    doc_no    = st.text_input("Document No.",  value=str(_sv("doc_no")))
-    eng_name  = st.text_input("Prepared by",   value=str(_sv("eng_name")))
-    chk_name  = st.text_input("Checked by",    value=str(_sv("chk_name")))
+    proj_name = st.text_input("Project Name", key="proj_name")
+    doc_no    = st.text_input("Document No.", key="doc_no")
+    eng_name  = st.text_input("Prepared by",  key="eng_name")
+    chk_name  = st.text_input("Checked by",   key="chk_name")
 
-    # ── Handle Save button (after all widgets so values are current) ──────────
-    if st.session_state.get("_save_trigger"):
-        save_data = {
-            "scalars": {
-                "width": width, "cl_lweb": cl_lweb, "cl_rweb": cl_rweb,
-                "fc": fc, "fci": fci, "fpu": fpu, "fpy_ratio": fpy_ratio,
-                "aps_strand": aps_strand, "duct_dia_mm": duct_dia_mm,
-                "num_tendon": int(num_tendon), "n_strands": int(n_strands),
-                "fpi_ratio": fpi_ratio, "init_loss_pct": int(init_loss_pct),
-                "eff_ratio": eff_ratio,
-                "phi_flex": phi_flex, "phi_shear": phi_shear,
-                "proj_name": proj_name, "doc_no": doc_no,
-                "eng_name": eng_name, "chk_name": chk_name,
-            },
+    # ── 💾 SAVE / 📂 OPEN ────────────────────────────────────────────────────
+    st.markdown("---")
+    with st.expander("💾  Save  /  📂  Open Project", expanded=True):
+
+        # ── SAVE: ดึงข้อมูลล่าสุดจาก State เพื่อรับประกันว่าได้ค่าตารางที่แก้ไขล่าสุดเสมอ ──
+        _save_data = {
+            "scalars": {k: st.session_state[k] for k in DEFAULT_SCALARS.keys()},
             "tables": {
                 "df_thickness": st.session_state.df_thickness.to_dict(orient="list"),
                 "df_tendon":    st.session_state.df_tendon.to_dict(orient="list"),
                 "df_load":      st.session_state.df_load.to_dict(orient="list"),
             },
         }
-        json_bytes = json.dumps(save_data, indent=2, ensure_ascii=False).encode("utf-8")
-        fname = f"{proj_name.replace(' ','_')}_{doc_no}.json"
-        # show inline download button
-        st.sidebar.download_button(
-            label="⬇️  Click to download",
-            data=json_bytes,
-            file_name=fname,
+        _json_bytes = json.dumps(_save_data, indent=2, ensure_ascii=False).encode("utf-8")
+        _fname = f"{st.session_state.proj_name.replace(' ','_')}_{st.session_state.doc_no}.json"
+
+        st.download_button(
+            label="💾  Save Project  (.json)",
+            data=_json_bytes,
+            file_name=_fname,
             mime="application/json",
-            key="dl_json",
+            use_container_width=True,
         )
+        st.caption("ตั้ง Chrome: Settings→Downloads→'Ask where to save' เพื่อเลือก folder เอง")
+        st.markdown("---")
+
+        # ── OPEN: โหลดและจัดระเบียบ Type ป้องกัน Slider/Number_input Crash ──
+        _up_key = f"uploader_{st.session_state['_uploader_reset']}"
+        uploaded_file = st.file_uploader(
+            "📂  Open Project  (.json)",
+            type="json",
+            key=_up_key,
+            help="เลือกไฟล์ .json ที่เคย Save ไว้",
+        )
+        
+        if uploaded_file is not None:
+            try:
+                loaded = json.loads(uploaded_file.read().decode("utf-8"))
+                
+                # โหลด Scalars พร้อมจับคู่ Type
+                for k, v in loaded.get("scalars", {}).items():
+                    if k in DEFAULT_SCALARS:
+                        def_val = DEFAULT_SCALARS[k]
+                        if isinstance(def_val, int):
+                            st.session_state[k] = int(v)
+                        elif isinstance(def_val, float):
+                            st.session_state[k] = float(v)
+                        else:
+                            st.session_state[k] = str(v)
+                            
+                # โหลด Tables
+                for k, v in loaded.get("tables", {}).items():
+                    if k in DEFAULT_TABLES:
+                        st.session_state[k] = pd.DataFrame(v)
+
+                # ทำลาย Uploader ป้องกัน Loop
+                st.session_state["_uploader_reset"] += 1
+                st.success("✅  Project loaded successfully!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌  Load error: {e}")
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3.  DATA EDITORS  (always shown — outside try block)
+# 3.  DATA EDITORS
 # ─────────────────────────────────────────────────────────────────────────────
 st.title("🏗️  PSC Box Girder — Top Flange Transverse Design")
 st.caption("AASHTO LRFD  |  1.0 m transverse strip  |  "
@@ -199,11 +192,15 @@ c1, c2 = st.columns(2)
 with c1:
     st.subheader("📏 Flange Thickness t(x)")
     df_thk = st.data_editor(st.session_state.df_thickness, num_rows="dynamic", key="ed_thk")
+    st.session_state.df_thickness = df_thk  # ซิงค์กลับทันทีเพื่อให้ Save ได้ตารางใหม่
+    
     st.subheader("🔩 Tendon Profile z(x)  [from top face]")
     df_tdn = st.data_editor(st.session_state.df_tendon,    num_rows="dynamic", key="ed_tdn")
+    st.session_state.df_tendon = df_tdn     # ซิงค์กลับทันที
 with c2:
     st.subheader("📦 Loads per 1 m strip")
     df_ld  = st.data_editor(st.session_state.df_load,      num_rows="dynamic", key="ed_ld")
+    st.session_state.df_load = df_ld        # ซิงค์กลับทันที
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 4.  CALCULATION ENGINE
