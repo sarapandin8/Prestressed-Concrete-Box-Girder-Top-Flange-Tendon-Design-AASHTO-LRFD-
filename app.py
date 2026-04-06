@@ -79,11 +79,24 @@ with st.sidebar:
     st.markdown("---")
     with st.expander("💾  Save  /  📂  Open Project", expanded=True):
 
-        # ── SAVE: read editor key state (safe read-only, set by data_editor on prev rerun)
-        # Fallback to src if editor hasn't run yet (first render)
+        # ── SAVE: robust helper — handles DataFrame, dict, or any other type
         def _tbl_save(editor_key, src_key):
-            df = st.session_state.get(editor_key, st.session_state.get(src_key, pd.DataFrame()))
-            return df.to_dict(orient="list") if not df.empty else {}
+            val = st.session_state.get(editor_key)
+            if val is None:
+                val = st.session_state.get(src_key, pd.DataFrame())
+            # Normalise to DataFrame regardless of what Streamlit stored
+            try:
+                df = val if isinstance(val, pd.DataFrame) else pd.DataFrame(val)
+                for col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors="coerce")
+                df = df.dropna(how="all")
+                return df.to_dict(orient="list") if not df.empty else {}
+            except Exception:
+                # Last-resort fallback: use the stable src key
+                src = st.session_state.get(src_key, pd.DataFrame())
+                if isinstance(src, pd.DataFrame) and not src.empty:
+                    return src.to_dict(orient="list")
+                return {}
         _save_data = {
             "scalars": {k: st.session_state[k] for k in DEFAULT_SCALARS.keys()},
             "tables": {
