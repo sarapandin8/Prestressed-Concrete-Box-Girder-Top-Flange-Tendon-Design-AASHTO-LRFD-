@@ -795,7 +795,7 @@ try:
             if v <= 0.80: return "background-color:#c6efce;color:#276221"
             if v <= 1.00: return "background-color:#ffeb9c;color:#9c6500"
             return "background-color:#ffc7ce;color:#9c0006"
-        return df_in.style.applymap(_s, subset=[col])
+        return df_in.style.map(_s, subset=[col])
 
     tabs = st.tabs([
         "📐 Geometry",
