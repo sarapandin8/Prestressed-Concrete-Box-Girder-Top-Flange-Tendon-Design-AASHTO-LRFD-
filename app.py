@@ -69,57 +69,7 @@ if "_uploader_reset" not in st.session_state:
 # 2.  SIDEBAR (Native State Binding)
 # ─────────────────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.header("⚙️ Design Parameters")
-
-    # ── 📐 Materials & Section ───────────────────────────────────────────────
-    with st.expander("📐 Materials & Section", expanded=True):
-        # ใช้ key=... อย่างเดียว Streamlit จะซิงค์ค่าให้เอง และไม่ค้างตอนโหลด
-        width       = st.number_input("Total Flange Width (m)",   min_value=1.0, key="width")
-        fc          = st.number_input("f'c  Service (MPa)",       min_value=20.0, key="fc")
-        fci         = st.number_input("f'ci Transfer (MPa)",      min_value=15.0, key="fci")
-        fpu         = st.number_input("fpu (MPa)",                key="fpu")
-        
-        # Selectbox logic
-        fpy_opts = [0.90, 0.85]
-        if st.session_state.fpy_ratio not in fpy_opts:
-            st.session_state.fpy_ratio = 0.90
-        fpy_ratio   = st.selectbox("fpy/fpu", fpy_opts, key="fpy_ratio", help="Low-relaxation=0.90  |  Stress-relieved=0.85")
-        
-        aps_strand  = st.number_input("Aps per strand (mm²)",     key="aps_strand")
-        duct_dia_mm = st.number_input("Duct diameter (mm)",       min_value=20.0, key="duct_dia_mm")
-
-    # ── 🌐 Web Geometry ──────────────────────────────────────────────────────
-    with st.expander("🌐  Web Geometry", expanded=True):
-        st.caption("ระบุตำแหน่ง Centerline ของ Web ซ้าย-ขวา จากขอบซ้ายของ Flange")
-        col_wl, col_wr = st.columns(2)
-        cl_lweb = col_wl.number_input("CL. L.Web (m)", min_value=0.0, step=0.05, key="cl_lweb")
-        cl_rweb = col_wr.number_input("CL. R.Web (m)", min_value=0.0, step=0.05, key="cl_rweb")
-        st.info(f"CL.L.Web = **{cl_lweb*1000:.0f} mm** |  "
-                f"CL.R.Web = **{cl_rweb*1000:.0f} mm** |  "
-                f"Span = **{(cl_rweb-cl_lweb)*1000:.0f} mm**")
-
-    # ── 🔩 Prestressing Force ────────────────────────────────────────────────
-    with st.expander("🔩 Prestressing Force", expanded=True):
-        num_tendon    = st.number_input("Tendons per 1 m strip",  min_value=1, key="num_tendon")
-        n_strands     = st.number_input("Strands per tendon",     min_value=1, key="n_strands")
-        fpi_ratio     = st.slider("fpi / fpu  (at jacking)",     0.70, 0.80, key="fpi_ratio")
-        init_loss_pct = st.slider("Immediate loss at Transfer (%)", 0, 15, key="init_loss_pct")
-        eff_ratio     = st.slider("Pe / Pi  (long-term ratio)",  0.50, 0.95, key="eff_ratio")
-
-    # ── ⚖️ Resistance Factors ────────────────────────────────────────────────
-    with st.expander("⚖️ Resistance Factors φ"):
-        phi_flex  = st.number_input("φ  Flexure", min_value=0.75, max_value=1.00, key="phi_flex")
-        phi_shear = st.number_input("φ  Shear",   min_value=0.70, max_value=1.00, key="phi_shear")
-
-    # ── 📄 Report Info ────────────────────────────────────────────────────────
-    st.markdown("---")
-    st.subheader("📄 Report Information")
-    proj_name = st.text_input("Project Name", key="proj_name")
-    doc_no    = st.text_input("Document No.", key="doc_no")
-    eng_name  = st.text_input("Prepared by",  key="eng_name")
-    chk_name  = st.text_input("Checked by",   key="chk_name")
-
-    # ── 💾 SAVE / 📂 OPEN ────────────────────────────────────────────────────
+        # ── 💾 SAVE / 📂 OPEN ────────────────────────────────────────────────────
     st.markdown("---")
     with st.expander("💾  Save  /  📂  Open Project", expanded=True):
 
@@ -180,6 +130,58 @@ with st.sidebar:
                 st.rerun()
             except Exception as e:
                 st.error(f"❌  Load error: {e}")
+
+
+        st.header("⚙️ Design Parameters")
+
+    # ── 📐 Materials & Section ───────────────────────────────────────────────
+    with st.expander("📐 Materials & Section", expanded=True):
+        # ใช้ key=... อย่างเดียว Streamlit จะซิงค์ค่าให้เอง และไม่ค้างตอนโหลด
+        width       = st.number_input("Total Flange Width (m)",   min_value=1.0, key="width")
+        fc          = st.number_input("f'c  Service (MPa)",       min_value=20.0, key="fc")
+        fci         = st.number_input("f'ci Transfer (MPa)",      min_value=15.0, key="fci")
+        fpu         = st.number_input("fpu (MPa)",                key="fpu")
+        
+        # Selectbox logic
+        fpy_opts = [0.90, 0.85]
+        if st.session_state.fpy_ratio not in fpy_opts:
+            st.session_state.fpy_ratio = 0.90
+        fpy_ratio   = st.selectbox("fpy/fpu", fpy_opts, key="fpy_ratio", help="Low-relaxation=0.90  |  Stress-relieved=0.85")
+        
+        aps_strand  = st.number_input("Aps per strand (mm²)",     key="aps_strand")
+        duct_dia_mm = st.number_input("Duct diameter (mm)",       min_value=20.0, key="duct_dia_mm")
+
+    # ── 🌐 Web Geometry ──────────────────────────────────────────────────────
+    with st.expander("🌐  Web Geometry", expanded=True):
+        st.caption("ระบุตำแหน่ง Centerline ของ Web ซ้าย-ขวา จากขอบซ้ายของ Flange")
+        col_wl, col_wr = st.columns(2)
+        cl_lweb = col_wl.number_input("CL. L.Web (m)", min_value=0.0, step=0.05, key="cl_lweb")
+        cl_rweb = col_wr.number_input("CL. R.Web (m)", min_value=0.0, step=0.05, key="cl_rweb")
+        st.info(f"CL.L.Web = **{cl_lweb*1000:.0f} mm** |  "
+                f"CL.R.Web = **{cl_rweb*1000:.0f} mm** |  "
+                f"Span = **{(cl_rweb-cl_lweb)*1000:.0f} mm**")
+
+    # ── 🔩 Prestressing Force ────────────────────────────────────────────────
+    with st.expander("🔩 Prestressing Force", expanded=True):
+        num_tendon    = st.number_input("Tendons per 1 m strip",  min_value=1, key="num_tendon")
+        n_strands     = st.number_input("Strands per tendon",     min_value=1, key="n_strands")
+        fpi_ratio     = st.slider("fpi / fpu  (at jacking)",     0.70, 0.80, key="fpi_ratio")
+        init_loss_pct = st.slider("Immediate loss at Transfer (%)", 0, 15, key="init_loss_pct")
+        eff_ratio     = st.slider("Pe / Pi  (long-term ratio)",  0.50, 0.95, key="eff_ratio")
+
+    # ── ⚖️ Resistance Factors ────────────────────────────────────────────────
+    with st.expander("⚖️ Resistance Factors φ"):
+        phi_flex  = st.number_input("φ  Flexure", min_value=0.75, max_value=1.00, key="phi_flex")
+        phi_shear = st.number_input("φ  Shear",   min_value=0.70, max_value=1.00, key="phi_shear")
+
+    # ── 📄 Report Info ────────────────────────────────────────────────────────
+    st.markdown("---")
+    st.subheader("📄 Report Information")
+    proj_name = st.text_input("Project Name", key="proj_name")
+    doc_no    = st.text_input("Document No.", key="doc_no")
+    eng_name  = st.text_input("Prepared by",  key="eng_name")
+    chk_name  = st.text_input("Checked by",   key="chk_name")
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 3.  DATA EDITORS
