@@ -57,15 +57,15 @@ for k, v in DEFAULT_SCALARS.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# ── Init editor keys as single source of truth for table data
-# data_editor reads/writes via key → no separate df_thickness needed
-for tbl_key, editor_key in [
-    ("df_thickness", "ed_thk"),
-    ("df_tendon",    "ed_tdn"),
-    ("df_load",      "ed_ld"),
-]:
-    if editor_key not in st.session_state:
-        st.session_state[editor_key] = pd.DataFrame(DEFAULT_TABLES[tbl_key])
+# ── Init table SOURCE keys (never same as editor widget key)
+# Rule: data_editor(data=session_state["thk_src"], key="ed_thk")
+#   - thk_src = stable data source, only changes on file load
+#   - ed_thk  = widget internal state managed by Streamlit (never write to it)
+# This prevents StreamlitValueAssignmentNotAllowedError AND double-input issue
+_TABLE_SRC = {"thk_src": "df_thickness", "tdn_src": "df_tendon", "ld_src": "df_load"}
+for src_key, tbl_key in _TABLE_SRC.items():
+    if src_key not in st.session_state:
+        st.session_state[src_key] = pd.DataFrame(DEFAULT_TABLES[tbl_key])
 
 if "_uploader_reset" not in st.session_state:
     st.session_state["_uploader_reset"] = 0
@@ -79,13 +79,17 @@ with st.sidebar:
     st.markdown("---")
     with st.expander("💾  Save  /  📂  Open Project", expanded=True):
 
-        # ── SAVE: read from editor key state (always current from previous rerun)
+        # ── SAVE: read editor key state (safe read-only, set by data_editor on prev rerun)
+        # Fallback to src if editor hasn't run yet (first render)
+        def _tbl_save(editor_key, src_key):
+            df = st.session_state.get(editor_key, st.session_state.get(src_key, pd.DataFrame()))
+            return df.to_dict(orient="list") if not df.empty else {}
         _save_data = {
             "scalars": {k: st.session_state[k] for k in DEFAULT_SCALARS.keys()},
             "tables": {
-                "df_thickness": st.session_state["ed_thk"].to_dict(orient="list"),
-                "df_tendon":    st.session_state["ed_tdn"].to_dict(orient="list"),
-                "df_load":      st.session_state["ed_ld"].to_dict(orient="list"),
+                "df_thickness": _tbl_save("ed_thk", "thk_src"),
+                "df_tendon":    _tbl_save("ed_tdn", "tdn_src"),
+                "df_load":      _tbl_save("ed_ld",  "ld_src"),
             },
         }
         _json_bytes = json.dumps(_save_data, indent=2, ensure_ascii=False).encode("utf-8")
@@ -125,20 +129,18 @@ with st.sidebar:
                         else:
                             st.session_state[k] = str(v)
                             
-                # โหลด Tables → อัปเดต editor keys โดยตรง
-                tbl_key_map = {
-                    "df_thickness": "ed_thk",
-                    "df_tendon":    "ed_tdn",
-                    "df_load":      "ed_ld",
-                }
-                for k, v in loaded.get("tables", {}).items():
-                    if k in tbl_key_map:
-                        editor_key = tbl_key_map[k]
-                        new_df = pd.DataFrame(v)
+                # โหลด Tables → อัปเดต src keys + ลบ editor keys ให้ reinit
+                _load_map = {"df_thickness":"thk_src","df_tendon":"tdn_src","df_load":"ld_src"}
+                for tbl_key, src_key in _load_map.items():
+                    if tbl_key in loaded.get("tables", {}):
+                        new_df = pd.DataFrame(loaded["tables"][tbl_key])
                         for col in new_df.columns:
                             new_df[col] = pd.to_numeric(new_df[col], errors="coerce")
-                        # อัปเดต editor key state โดยตรง → data_editor จะแสดงค่าใหม่ทันที
-                        st.session_state[editor_key] = new_df
+                        st.session_state[src_key] = new_df
+                # ลบ editor key state → data_editor จะ reinit จาก src บน rerun ถัดไป
+                for ek in ["ed_thk", "ed_tdn", "ed_ld"]:
+                    if ek in st.session_state:
+                        del st.session_state[ek]
 
                 # ทำลาย Uploader ป้องกัน Loop
                 st.session_state["_uploader_reset"] += 1
@@ -205,22 +207,19 @@ st.caption("AASHTO LRFD  |  1.0 m transverse strip  |  "
 c1, c2 = st.columns(2)
 with c1:
     st.subheader("📏 Flange Thickness t(x)")
-    # Pass st.session_state["ed_thk"] as data AND key="ed_thk"
-    # → data_editor uses the SAME object as its source and target → no reset, no double-input
-    df_thk = st.data_editor(st.session_state["ed_thk"], num_rows="dynamic", key="ed_thk")
-
+    # Pass src key (stable, never same object as widget key) → no reset → single input works
+    df_thk = st.data_editor(st.session_state["thk_src"], num_rows="dynamic", key="ed_thk")
     st.subheader("🔩 Tendon Profile z(x)  [from top face]")
-    df_tdn = st.data_editor(st.session_state["ed_tdn"], num_rows="dynamic", key="ed_tdn")
+    df_tdn = st.data_editor(st.session_state["tdn_src"], num_rows="dynamic", key="ed_tdn")
 with c2:
     st.subheader("📦 Loads per 1 m strip")
-    df_ld  = st.data_editor(st.session_state["ed_ld"],  num_rows="dynamic", key="ed_ld")
-# No sync-back needed: data_editor writes directly to st.session_state["ed_thk"] etc.
+    df_ld  = st.data_editor(st.session_state["ld_src"],  num_rows="dynamic", key="ed_ld")
+# No sync-back: Streamlit forbids writing to widget key; data_editor manages ed_thk etc.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 4.  CALCULATION ENGINE
 # ─────────────────────────────────────────────────────────────────────────────
 def prep(df):
-    """Force all columns to float64 (handles dtype O from empty new rows), drop NaN rows."""
     df = df.copy()
     for col in df.columns:
         df[col] = pd.to_numeric(df[col], errors="coerce")
