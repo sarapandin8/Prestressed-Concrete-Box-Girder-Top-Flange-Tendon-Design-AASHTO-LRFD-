@@ -29,8 +29,8 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 st.set_page_config(layout="wide", page_title="PSC Box Girder — Top Flange Design")
 
 DEFAULT_SCALARS = dict(
-    width=10.0, cl_lweb=2.0, cl_rweb=8.0,
-    fc=40.0, fci=30.0, fpu=1860.0, fpy_ratio=0.90,
+    width=12.0, cl_lweb=2.0, cl_rweb=10.0,
+    fc=45.0, fci=36.0, fpu=1860.0, fpy_ratio=0.90,
     aps_strand=140.0, duct_dia_mm=70.0,
     num_tendon=1, n_strands=5,
     fpi_ratio=0.75, init_loss_pct=5, eff_ratio=0.80,
