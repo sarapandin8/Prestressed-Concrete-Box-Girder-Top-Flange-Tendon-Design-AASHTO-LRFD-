@@ -29,7 +29,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 st.set_page_config(layout="wide", page_title="PSC Box Girder — Top Flange Design")
 
 DEFAULT_SCALARS = dict(
-    width=6.0, cl_lweb=1.50, cl_rweb=4.50,
+    width=10.0, cl_lweb=1.50, cl_rweb=4.50,
     fc=40.0, fci=30.0, fpu=1860.0, fpy_ratio=0.90,
     aps_strand=140.0, duct_dia_mm=70.0,
     num_tendon=2, n_strands=12,
@@ -39,16 +39,16 @@ DEFAULT_SCALARS = dict(
     eng_name="Engineer Name", chk_name="Checker Name",
 )
 DEFAULT_TABLES = dict(
-    df_thickness={"x (m)": [0.0, 3.0, 6.0], "t (m)": [0.30, 0.25, 0.30]},
-    df_tendon={"x (m)": [0.0, 3.0, 6.0], "z_top (m)": [0.08, 0.18, 0.08]},
+    df_thickness={"x (m)": [0.0, 2.0, 4.0, 5.0, 6.0, 0.8, 10.0], "t (m)": [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25]},
+    df_tendon={"x (m)": [0.0, 2.0, 4.0, 5.0, 6.0, 0.8, 10.0], "z_top (m)": [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]},
     df_load={
-        "x (m)":         [ 0.0,    3.0,    6.0],
-        "M_DL (kNm/m)":  [-120.0,  80.0, -120.0],
-        "V_DL (kN/m)":   [  60.0,   0.0,   60.0],
-        "M_SDL (kNm/m)": [ -40.0,  25.0,  -40.0],
-        "V_SDL (kN/m)":  [  20.0,   0.0,   20.0],
-        "M_LL (kNm/m)":  [-180.0, 120.0, -180.0],
-        "V_LL (kN/m)":   [  80.0,   0.0,   80.0],
+        "x (m)":         [ 0.0, 2.0, 4.0, 5.0, 6.0, 0.8, 10.0],
+        "M_DL (kNm/m)":  [   0,   0,   0,   0,   0,   0,    0],
+        "V_DL (kN/m)":   [   0,   0,   0,   0,   0,   0,    0],
+        "M_SDL (kNm/m)": [   0,   0,   0,   0,   0,   0,    0],
+        "V_SDL (kN/m)":  [   0,   0,   0,   0,   0,   0,    0],
+        "M_LL (kNm/m)":  [   0,   0,   0,   0,   0,   0,    0],
+        "V_LL (kN/m)":   [   0,   0,   0,   0,   0,   0,    0],
     },
 )
 
@@ -338,7 +338,7 @@ def run_calc(dft, dfp, dfl):
     phi_Vn = phi_shear * np.minimum(Vc, Vn_lim)
 
     # Allowable limits
-    lim_tr_c  = -0.60*fci;  lim_tr_t  =  0.25*math.sqrt(fci)
+    lim_tr_c  = -0.60*fci;  lim_tr_t  =  0.63*math.sqrt(fci)
     lim_sv_cp = -0.45*fc;   lim_sv_ct = -0.60*fc
     lim_sv_t  =  0.50*math.sqrt(fc)
 
@@ -1093,7 +1093,7 @@ try:
         fig2.add_hline(y=R["lim_tr_c"], line_dash="dash", line_color="orange",
                        annotation_text=f"−0.60f'ci = {R['lim_tr_c']:.2f} MPa")
         fig2.add_hline(y=R["lim_tr_t"], line_dash="dash", line_color="green",
-                       annotation_text=f"+0.25√f'ci = +{R['lim_tr_t']:.3f} MPa")
+                       annotation_text=f"+0.63√f'ci = +{R['lim_tr_t']:.3f} MPa")
         fig2.update_layout(height=380, xaxis_title="x (m)", yaxis_title="Stress (MPa)")
         st.plotly_chart(fig2, use_container_width=True)
         rows_tr = [{"x (m)": f"{R['x'][i]:.2f}",
