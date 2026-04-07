@@ -29,26 +29,26 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 st.set_page_config(layout="wide", page_title="PSC Box Girder — Top Flange Design")
 
 DEFAULT_SCALARS = dict(
-    width=10.0, cl_lweb=1.50, cl_rweb=4.50,
+    width=10.0, cl_lweb=2.0, cl_rweb=8.0,
     fc=40.0, fci=30.0, fpu=1860.0, fpy_ratio=0.90,
     aps_strand=140.0, duct_dia_mm=70.0,
-    num_tendon=2, n_strands=12,
+    num_tendon=1, n_strands=5,
     fpi_ratio=0.75, init_loss_pct=5, eff_ratio=0.80,
     phi_flex=1.00, phi_shear=0.90,
     proj_name="Bridge Lane Expansion", doc_no="CALC-STR-001",
     eng_name="Engineer Name", chk_name="Checker Name",
 )
 DEFAULT_TABLES = dict(
-    df_thickness={"x (m)": [0.0, 2.0, 4.0, 5.0, 6.0, 8.0, 10.0], "t (m)": [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25]},
-    df_tendon={"x (m)": [0.0, 2.0, 4.0, 5.0, 6.0, 8.0, 10.0], "z_top (m)": [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]},
+    df_thickness={"x (m)": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0], "t (m)": [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25]},
+    df_tendon={"x (m)": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0], "z_top (m)": [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]},
     df_load={
-        "x (m)":         [ 0.0, 2.0, 4.0, 5.0, 6.0, 8.0, 10.0],
-        "M_DL (kNm/m)":  [   0,   0,   0,   0,   0,   0,    0],
-        "V_DL (kN/m)":   [   0,   0,   0,   0,   0,   0,    0],
-        "M_SDL (kNm/m)": [   0,   0,   0,   0,   0,   0,    0],
-        "V_SDL (kN/m)":  [   0,   0,   0,   0,   0,   0,    0],
-        "M_LL (kNm/m)":  [   0,   0,   0,   0,   0,   0,    0],
-        "V_LL (kN/m)":   [   0,   0,   0,   0,   0,   0,    0],
+        "x (m)":         [ 0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0],
+        "M_DL (kNm/m)":  [   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,    0,    0,    0,    0],
+        "V_DL (kN/m)":   [   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,    0,    0,    0,    0],
+        "M_SDL (kNm/m)": [   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,    0,    0,    0,    0],
+        "V_SDL (kN/m)":  [   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,    0,    0,    0,    0],
+        "M_LL (kNm/m)":  [   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,    0,    0,    0,    0],
+        "V_LL (kN/m)":   [   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,    0,    0,    0,    0],
     },
 )
 
