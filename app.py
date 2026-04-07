@@ -57,18 +57,18 @@ for k, v in DEFAULT_SCALARS.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# ── Init table data (stored separately from widget keys)
+# ── Init table data under df_* keys
 for tbl_key, tbl_data in DEFAULT_TABLES.items():
     if tbl_key not in st.session_state:
         st.session_state[tbl_key] = pd.DataFrame(tbl_data)
 
-# ── Version counter: incrementing changes data_editor key → brand-new widget
-# This is the ONLY reliable way to force data_editor to show new data after file load
+# _tbl_ver: increment on file load → forces data_editor to reinit (versioned widget key)
 if "_tbl_ver" not in st.session_state:
     st.session_state["_tbl_ver"] = 0
 
-if "_uploader_reset" not in st.session_state:
-    st.session_state["_uploader_reset"] = 0
+# _loaded_hash: hash of last loaded file bytes → prevents rerun loop with static uploader key
+if "_loaded_hash" not in st.session_state:
+    st.session_state["_loaded_hash"] = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -79,15 +79,12 @@ with st.sidebar:
     st.markdown("---")
     with st.expander("💾  Save  /  📂  Open Project", expanded=True):
 
-        # ── SAVE ────────────────────────────────────────────────────
-        # Read table data from versioned editor keys (current user edits),
-        # falling back to base df_* keys if editor hasn't touched them yet.
+        # ── SAVE ─────────────────────────────────────────────────────────
+        # Read from versioned editor key (current user edits), fallback to base df_*
         _v = st.session_state["_tbl_ver"]
-        def _get_tbl(base_key):
-            ed_key = f"ed_{base_key}_{_v}"   # matches data_editor key pattern
-            raw = st.session_state.get(ed_key, st.session_state.get(base_key))
-            if raw is None:
-                return {}
+        def _get_tbl_for_save(base_key):
+            raw = st.session_state.get(f"ed_{base_key}_{_v}",
+                                       st.session_state.get(base_key, pd.DataFrame()))
             try:
                 df = raw if isinstance(raw, pd.DataFrame) else pd.DataFrame(raw)
                 for col in df.columns:
@@ -100,9 +97,9 @@ with st.sidebar:
         _save_data = {
             "scalars": {k: st.session_state[k] for k in DEFAULT_SCALARS},
             "tables": {
-                "df_thickness": _get_tbl("df_thickness"),
-                "df_tendon":    _get_tbl("df_tendon"),
-                "df_load":      _get_tbl("df_load"),
+                "df_thickness": _get_tbl_for_save("df_thickness"),
+                "df_tendon":    _get_tbl_for_save("df_tendon"),
+                "df_load":      _get_tbl_for_save("df_load"),
             },
         }
         _json_bytes = json.dumps(_save_data, indent=2, ensure_ascii=False).encode("utf-8")
@@ -115,46 +112,50 @@ with st.sidebar:
         st.caption("ตั้ง Chrome: Settings → Downloads → 'Ask where to save' เพื่อเลือก folder เอง")
         st.markdown("---")
 
-        # ── OPEN ────────────────────────────────────────────────────
-        # Key changes with _uploader_reset → prevents rerun loop
-        _up_key = f"uploader_{st.session_state['_uploader_reset']}"
+        # ── OPEN ─────────────────────────────────────────────────────────
+        # STATIC key "proj_uploader" — never changes → file always reaches handler
+        # Loop prevention: hash of file bytes, only process when hash changes
         uploaded_file = st.file_uploader(
-            "📂  Open Project  (.json)", type="json", key=_up_key,
+            "📂  Open Project  (.json)",
+            type="json",
+            key="proj_uploader",           # ← STATIC key (root fix)
             help="เลือกไฟล์ .json ที่เคย Save ไว้",
         )
         if uploaded_file is not None:
-            try:
-                loaded = json.loads(uploaded_file.read().decode("utf-8"))
+            raw_bytes = uploaded_file.getvalue()   # bytes, stable across reruns
+            file_hash = hash(raw_bytes)
+            if st.session_state.get("_loaded_hash") != file_hash:
+                try:
+                    loaded = json.loads(raw_bytes.decode("utf-8"))
 
-                # ── Load scalars with type safety
-                for k, v in loaded.get("scalars", {}).items():
-                    if k in DEFAULT_SCALARS:
-                        dv = DEFAULT_SCALARS[k]
-                        st.session_state[k] = (
-                            int(v)   if isinstance(dv, int)   else
-                            float(v) if isinstance(dv, float) else
-                            str(v)
-                        )
+                    # Load scalars with type matching
+                    for k, v in loaded.get("scalars", {}).items():
+                        if k in DEFAULT_SCALARS:
+                            dv = DEFAULT_SCALARS[k]
+                            st.session_state[k] = (
+                                int(v)   if isinstance(dv, int)   else
+                                float(v) if isinstance(dv, float) else
+                                str(v)
+                            )
 
-                # ── Load tables into base df_* keys
-                for tbl_key in ["df_thickness", "df_tendon", "df_load"]:
-                    raw = loaded.get("tables", {}).get(tbl_key)
-                    if raw:
-                        new_df = pd.DataFrame(raw)
-                        for col in new_df.columns:
-                            new_df[col] = pd.to_numeric(new_df[col], errors="coerce")
-                        st.session_state[tbl_key] = new_df.dropna(how="all")
+                    # Load tables → update df_* base keys
+                    for tbl_key in ["df_thickness", "df_tendon", "df_load"]:
+                        raw_tbl = loaded.get("tables", {}).get(tbl_key)
+                        if raw_tbl:
+                            new_df = pd.DataFrame(raw_tbl)
+                            for col in new_df.columns:
+                                new_df[col] = pd.to_numeric(new_df[col], errors="coerce")
+                            st.session_state[tbl_key] = new_df.dropna(how="all")
 
-                # ── Increment version → data_editor gets new key → brand-new widget
-                # This is the ONLY way to guarantee data_editor shows new data
-                st.session_state["_tbl_ver"] += 1
-                # Reset uploader so file_uploader clears itself (no rerun loop)
-                st.session_state["_uploader_reset"] += 1
+                    # Increment version → data_editor gets new key → shows new data
+                    st.session_state["_tbl_ver"] += 1
+                    # Mark this file as processed (prevents rerun loop)
+                    st.session_state["_loaded_hash"] = file_hash
 
-                st.success("✅  Project loaded successfully!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"❌  Load error: {e}")
+                    st.success("✅  Project loaded successfully!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌  Load error: {e}")
     # ── 📐 Materials & Section ───────────────────────────────────────────────
     with st.expander("📐 Materials & Section", expanded=True):
         # ใช้ key=... อย่างเดียว Streamlit จะซิงค์ค่าให้เอง และไม่ค้างตอนโหลด
@@ -211,14 +212,13 @@ st.title("🏗️  PSC Box Girder — Top Flange Transverse Design")
 st.caption("AASHTO LRFD  |  1.0 m transverse strip  |  "
            "Compression (−)  Tension (+)  |  +M = sagging")
 
-# Versioned keys: when _tbl_ver increments (after file load), new keys = new widgets
-# This forces data_editor to re-initialize from the updated df_* session state
+# Versioned editor keys: when _tbl_ver increments (after file load),
+# key changes → brand-new widget → initialises from updated df_* → shows loaded data
 _v = st.session_state["_tbl_ver"]
 
 c1, c2 = st.columns(2)
 with c1:
     st.subheader("📏 Flange Thickness t(x)")
-    # data = df_thickness (base), key = ed_df_thickness_{ver} (versioned, never same as data key)
     df_thk = st.data_editor(
         st.session_state["df_thickness"],
         num_rows="dynamic", key=f"ed_df_thickness_{_v}"
