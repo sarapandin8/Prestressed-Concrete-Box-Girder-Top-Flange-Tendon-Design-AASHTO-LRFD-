@@ -1045,7 +1045,7 @@ try:
                           else [f"x={v:.1f}m" for v in sta_x])
         for xi_m, lbl in zip(sta_x, default_labels):
             fig.add_annotation(
-                x=xi_m*1000, y=y_range[0]*0.82,
+                x=xi_m, y=y_range[0]*0.82,
                 text=lbl, showarrow=False,
                 font=dict(size=9, color="gray"),
                 xanchor="center",
@@ -1055,7 +1055,7 @@ try:
             title="Top Flange Cross-Section with Tendon Layout",
             height=420,
             xaxis=dict(
-                title="Distance from Left Edge (mm)",
+                title="Distance from Left Edge x (m)",
                 range=[-width_mm*0.04, width_mm*1.04],
                 showgrid=True, gridcolor="rgba(200,200,200,0.4)",
             ),
