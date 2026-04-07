@@ -57,15 +57,15 @@ for k, v in DEFAULT_SCALARS.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# ── Init table SOURCE keys (never same as editor widget key)
-# Rule: data_editor(data=session_state["thk_src"], key="ed_thk")
-#   - thk_src = stable data source, only changes on file load
-#   - ed_thk  = widget internal state managed by Streamlit (never write to it)
-# This prevents StreamlitValueAssignmentNotAllowedError AND double-input issue
-_TABLE_SRC = {"thk_src": "df_thickness", "tdn_src": "df_tendon", "ld_src": "df_load"}
-for src_key, tbl_key in _TABLE_SRC.items():
-    if src_key not in st.session_state:
-        st.session_state[src_key] = pd.DataFrame(DEFAULT_TABLES[tbl_key])
+# ── Init table data (stored separately from widget keys)
+for tbl_key, tbl_data in DEFAULT_TABLES.items():
+    if tbl_key not in st.session_state:
+        st.session_state[tbl_key] = pd.DataFrame(tbl_data)
+
+# ── Version counter: incrementing changes data_editor key → brand-new widget
+# This is the ONLY reliable way to force data_editor to show new data after file load
+if "_tbl_ver" not in st.session_state:
+    st.session_state["_tbl_ver"] = 0
 
 if "_uploader_reset" not in st.session_state:
     st.session_state["_uploader_reset"] = 0
@@ -79,93 +79,78 @@ with st.sidebar:
     st.markdown("---")
     with st.expander("💾  Save  /  📂  Open Project", expanded=True):
 
-        # ── SAVE: robust helper — handles DataFrame, dict, or any other type
-        def _tbl_save(editor_key, src_key):
-            val = st.session_state.get(editor_key)
-            if val is None:
-                val = st.session_state.get(src_key, pd.DataFrame())
-            # Normalise to DataFrame regardless of what Streamlit stored
+        # ── SAVE ────────────────────────────────────────────────────
+        # Read table data from versioned editor keys (current user edits),
+        # falling back to base df_* keys if editor hasn't touched them yet.
+        _v = st.session_state["_tbl_ver"]
+        def _get_tbl(base_key):
+            ed_key = f"ed_{base_key}_{_v}"   # matches data_editor key pattern
+            raw = st.session_state.get(ed_key, st.session_state.get(base_key))
+            if raw is None:
+                return {}
             try:
-                df = val if isinstance(val, pd.DataFrame) else pd.DataFrame(val)
+                df = raw if isinstance(raw, pd.DataFrame) else pd.DataFrame(raw)
                 for col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors="coerce")
                 df = df.dropna(how="all")
                 return df.to_dict(orient="list") if not df.empty else {}
             except Exception:
-                # Last-resort fallback: use the stable src key
-                src = st.session_state.get(src_key, pd.DataFrame())
-                if isinstance(src, pd.DataFrame) and not src.empty:
-                    return src.to_dict(orient="list")
                 return {}
+
         _save_data = {
-            "scalars": {k: st.session_state[k] for k in DEFAULT_SCALARS.keys()},
+            "scalars": {k: st.session_state[k] for k in DEFAULT_SCALARS},
             "tables": {
-                "df_thickness": _tbl_save("ed_thk", "thk_src"),
-                "df_tendon":    _tbl_save("ed_tdn", "tdn_src"),
-                "df_load":      _tbl_save("ed_ld",  "ld_src"),
+                "df_thickness": _get_tbl("df_thickness"),
+                "df_tendon":    _get_tbl("df_tendon"),
+                "df_load":      _get_tbl("df_load"),
             },
         }
         _json_bytes = json.dumps(_save_data, indent=2, ensure_ascii=False).encode("utf-8")
         _fname = f"{st.session_state.proj_name.replace(' ','_')}_{st.session_state.doc_no}.json"
-
         st.download_button(
             label="💾  Save Project  (.json)",
-            data=_json_bytes,
-            file_name=_fname,
-            mime="application/json",
-            use_container_width=True,
+            data=_json_bytes, file_name=_fname,
+            mime="application/json", use_container_width=True,
         )
-        st.caption("ตั้ง Chrome: Settings→Downloads→'Ask where to save' เพื่อเลือก folder เอง")
+        st.caption("ตั้ง Chrome: Settings → Downloads → 'Ask where to save' เพื่อเลือก folder เอง")
         st.markdown("---")
 
-        # ── OPEN: โหลดและจัดระเบียบ Type ป้องกัน Slider/Number_input Crash ──
+        # ── OPEN ────────────────────────────────────────────────────
+        # Key changes with _uploader_reset → prevents rerun loop
         _up_key = f"uploader_{st.session_state['_uploader_reset']}"
         uploaded_file = st.file_uploader(
-            "📂  Open Project  (.json)",
-            type="json",
-            key=_up_key,
+            "📂  Open Project  (.json)", type="json", key=_up_key,
             help="เลือกไฟล์ .json ที่เคย Save ไว้",
         )
-        
         if uploaded_file is not None:
             try:
                 loaded = json.loads(uploaded_file.read().decode("utf-8"))
-                
-                # โหลด Scalars พร้อมจับคู่ Type
+
+                # ── Load scalars with type safety
                 for k, v in loaded.get("scalars", {}).items():
                     if k in DEFAULT_SCALARS:
-                        def_val = DEFAULT_SCALARS[k]
-                        if isinstance(def_val, int):
-                            st.session_state[k] = int(v)
-                        elif isinstance(def_val, float):
-                            st.session_state[k] = float(v)
-                        else:
-                            st.session_state[k] = str(v)
-                            
-                # โหลด Tables → อัปเดต src keys + ลบ editor keys ให้ reinit
-                _load_map = {"df_thickness":"thk_src","df_tendon":"tdn_src","df_load":"ld_src"}
-                loaded_tables = loaded.get("tables", {})
-                for tbl_key, src_key in _load_map.items():
-                    if tbl_key in loaded_tables:
-                        # ตรวจสอบว่าข้อมูลในตารางไม่ว่างเปล่า
-                        table_data = loaded_tables[tbl_key]
-                        if table_data:
-                            new_df = pd.DataFrame(table_data)
-                            for col in new_df.columns:
-                                new_df[col] = pd.to_numeric(new_df[col], errors="coerce")
-                            st.session_state[src_key] = new_df
-                
-                # ลบ editor key state และข้อมูลที่แก้ไขค้างไว้ เพื่อให้ data_editor ดึงค่าใหม่จาก src_key
-                for ek in ["ed_thk", "ed_tdn", "ed_ld"]:
-                    if ek in st.session_state:
-                        del st.session_state[ek]
-                    # ลบข้อมูลที่ Streamlit เก็บไว้ใน widget state ภายใน (ถ้ามี)
-                    internal_key = f"{ek}_editor_state"
-                    if internal_key in st.session_state:
-                        del st.session_state[internal_key]
+                        dv = DEFAULT_SCALARS[k]
+                        st.session_state[k] = (
+                            int(v)   if isinstance(dv, int)   else
+                            float(v) if isinstance(dv, float) else
+                            str(v)
+                        )
 
-                # ทำลาย Uploader ป้องกัน Loop
+                # ── Load tables into base df_* keys
+                for tbl_key in ["df_thickness", "df_tendon", "df_load"]:
+                    raw = loaded.get("tables", {}).get(tbl_key)
+                    if raw:
+                        new_df = pd.DataFrame(raw)
+                        for col in new_df.columns:
+                            new_df[col] = pd.to_numeric(new_df[col], errors="coerce")
+                        st.session_state[tbl_key] = new_df.dropna(how="all")
+
+                # ── Increment version → data_editor gets new key → brand-new widget
+                # This is the ONLY way to guarantee data_editor shows new data
+                st.session_state["_tbl_ver"] += 1
+                # Reset uploader so file_uploader clears itself (no rerun loop)
                 st.session_state["_uploader_reset"] += 1
+
                 st.success("✅  Project loaded successfully!")
                 st.rerun()
             except Exception as e:
@@ -226,17 +211,29 @@ st.title("🏗️  PSC Box Girder — Top Flange Transverse Design")
 st.caption("AASHTO LRFD  |  1.0 m transverse strip  |  "
            "Compression (−)  Tension (+)  |  +M = sagging")
 
+# Versioned keys: when _tbl_ver increments (after file load), new keys = new widgets
+# This forces data_editor to re-initialize from the updated df_* session state
+_v = st.session_state["_tbl_ver"]
+
 c1, c2 = st.columns(2)
 with c1:
     st.subheader("📏 Flange Thickness t(x)")
-    # Pass src key (stable, never same object as widget key) → no reset → single input works
-    df_thk = st.data_editor(st.session_state["thk_src"], num_rows="dynamic", key="ed_thk")
+    # data = df_thickness (base), key = ed_df_thickness_{ver} (versioned, never same as data key)
+    df_thk = st.data_editor(
+        st.session_state["df_thickness"],
+        num_rows="dynamic", key=f"ed_df_thickness_{_v}"
+    )
     st.subheader("🔩 Tendon Profile z(x)  [from top face]")
-    df_tdn = st.data_editor(st.session_state["tdn_src"], num_rows="dynamic", key="ed_tdn")
+    df_tdn = st.data_editor(
+        st.session_state["df_tendon"],
+        num_rows="dynamic", key=f"ed_df_tendon_{_v}"
+    )
 with c2:
     st.subheader("📦 Loads per 1 m strip")
-    df_ld  = st.data_editor(st.session_state["ld_src"],  num_rows="dynamic", key="ed_ld")
-# No sync-back: Streamlit forbids writing to widget key; data_editor manages ed_thk etc.
+    df_ld = st.data_editor(
+        st.session_state["df_load"],
+        num_rows="dynamic", key=f"ed_df_load_{_v}"
+    )
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 4.  CALCULATION ENGINE
