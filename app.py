@@ -952,31 +952,31 @@ try:
 
     with tabs[0]:
         st.subheader("Top Flange Cross-Section with Tendon Layout")
-        
-        # ── ใช้หน่วย m สำหรับแกนนอน (x) และ mm สำหรับแกนตั้ง (y) ──────────────
-        x_m = R["x"]            # แกน x เป็นหน่วยเมตร (0 ถึง 12)
+
+        # ── convert to mm for display ──────────────────────────────────
+        x_mm   = R["x"] * 1000.0
         top_mm = np.zeros(N)
         bot_mm = -R["t"] * 1000.0
-        cg_mm = -R["yc"] * 1000.0
+        cg_mm  = -R["yc"] * 1000.0
         tdn_mm = -R["z"] * 1000.0
-        
-        t_max_mm = float(R["t"].max()) * 1000.0
-        t_min_mm = float(R["t"].min()) * 1000.0
-        
-        # คำนวณ Ratio ให้หน้าตัดยังดูสมส่วน (Exaggerated thickness) เมื่อ x เป็น m และ y เป็น mm
-        # 1 unit ของ x (1m) จะกว้างเท่ากับ scale_k * 1000 units ของ y (mm)
-        width_mm = width * 1000.0
-        scale_k = max(1.0, round(0.15 * width_mm / t_max_mm))
-        visual_scaleratio = scale_k * 1000.0 
-        
+
+        # ── dimensions in mm ────────────────────────────────────────
+        t_max_mm   = float(R["t"].max()) * 1000.0
+        t_min_mm   = float(R["t"].min()) * 1000.0
+        width_mm   = width * 1000.0
+        cl_lweb_mm = cl_lweb * 1000.0   # user-defined CL. L.Web
+        cl_rweb_mm = cl_rweb * 1000.0   # user-defined CL. R.Web
+
+        # ── scaleratio: thickness ≈ 15% of visual width ──────────────
+        scale_k  = max(1.0, round(0.15 * width_mm / t_max_mm))
         y_margin = t_max_mm * 1.8
-        y_range = [-t_max_mm - y_margin, y_margin]
-        
+        y_range  = [-t_max_mm - y_margin, y_margin]
+
         fig = go.Figure()
 
         # Section fill
         fig.add_trace(go.Scatter(
-            x=np.concatenate([x_m, x_m[::-1]]),
+            x=np.concatenate([x_mm, x_mm[::-1]]),
             y=np.concatenate([top_mm, bot_mm[::-1]]),
             fill="toself",
             fillcolor="rgba(173, 204, 240, 0.45)",
@@ -987,65 +987,91 @@ try:
 
         # Section CG
         fig.add_trace(go.Scatter(
-            x=x_m, y=cg_mm,
+            x=x_mm, y=cg_mm,
             mode="lines",
             line=dict(color="gray", dash="dot", width=1),
             name="Section CG",
         ))
 
-        # Tendon CGS Line
+        # Tendon CGS — interpolated line (smooth curve)
         fig.add_trace(go.Scatter(
-            x=x_m, y=tdn_mm,
+            x=x_mm, y=tdn_mm,
             mode="lines",
             line=dict(color="red", width=2.0),
             name="Tendon CGS",
             showlegend=True,
         ))
-
-        # Tendon Input Points (Dots)
-        tdn_dot_x = prep(df_tdn)["x (m)"]
-        tdn_dot_y = -prep(df_tdn)["z_top (m)"] * 1000.0
+        # Tendon CGS — dots ONLY at user-defined input stations
+        tdn_dot_x = prep(df_tdn)["x (m)"].values * 1000.0
+        tdn_dot_y = -prep(df_tdn)["z_top (m)"].values * 1000.0
         fig.add_trace(go.Scatter(
             x=tdn_dot_x, y=tdn_dot_y,
             mode="markers",
-            marker=dict(color="red", size=6, symbol="circle-open"),
-            name="Input Stations",
+            marker=dict(color="red", size=9, symbol="circle",
+                        line=dict(color="white", width=1.5)),
+            name="Tendon input pts",
+            showlegend=True,
         ))
 
-        # Web Centerlines (Vertical Lines)
-        for cl, name in zip([cl_lweb, cl_rweb], ["CL. L.Web", "CL. R.Web"]):
-            fig.add_vline(x=cl, line_width=1.5, line_dash="dash", line_color="black")
-            fig.add_annotation(
-                x=cl, y=y_margin*0.7, text=name,
-                showarrow=False, font=dict(size=10, color="black"), bgcolor="white"
+        # ── Flange edges (Left & Right) — cyan dashed ──────────────
+        for x_edge, label, a_pos in [
+            (0.0,      "Edge L.Flange", "top right"),
+            (width_mm, "Edge R.Flange", "top left"),
+        ]:
+            fig.add_vline(
+                x=x_edge,
+                line=dict(color="rgba(0,170,170,0.85)", dash="dot", width=1.8),
+                annotation_text=f"<b>{label}</b>",
+                annotation_position=a_pos,
+                annotation_font=dict(size=10, color="rgba(0,150,150,1)"),
             )
 
-        # ── ตั้งค่าแกน x ให้เป็นหน่วยเมตร และเอาข้อความที่ไม่จำเป็นออก ──────────
+        # ── Web centerlines (user-defined) — orange dashed ─────────
+        for x_wf, label, a_pos in [
+            (cl_lweb_mm, "CL. L.Web", "top right"),
+            (cl_rweb_mm, "CL. R.Web", "top left"),
+        ]:
+            fig.add_vline(
+                x=x_wf,
+                line=dict(color="rgba(200,100,0,0.9)", dash="dash", width=2.0),
+                annotation_text=f"<b>{label}</b>",
+                annotation_position=a_pos,
+                annotation_font=dict(size=10, color="rgba(200,100,0,1)"),
+            )
+
+        # ── Station x-labels ────────────────────────────────────────
+        default_labels = (["Sec B (L)", "Sec A (L)", "Sec A (R)", "Sec B (R)"]
+                          if len(sta_x) == 4
+                          else [f"x={v:.1f}m" for v in sta_x])
+        for xi_m, lbl in zip(sta_x, default_labels):
+            fig.add_annotation(
+                x=xi_m, y=y_range[0]*0.82,
+                text=lbl, showarrow=False,
+                font=dict(size=9, color="gray"),
+                xanchor="center",
+            )
+
         fig.update_layout(
             title="Top Flange Cross-Section with Tendon Layout",
             height=420,
             xaxis=dict(
-                title="Distance from Left Edge x (m)", # คงชื่อแกนไว้
-                range=[-width * 0.04, width * 1.04],   # ปรับ range เป็นเมตร
-                showgrid=True,
-                gridcolor="rgba(200,200,200,0.4)",
+                title="Distance from Left Edge x (m)",
+                range=[-width_mm*0.04, width_mm*1.04],
+                showgrid=True, gridcolor="rgba(200,200,200,0.4)",
             ),
             yaxis=dict(
                 title="Depth (mm)",
                 range=y_range,
-                showgrid=True,
-                gridcolor="rgba(200,200,200,0.4)",
+                showgrid=True, gridcolor="rgba(200,200,200,0.4)",
                 scaleanchor="x",
-                scaleratio=visual_scaleratio, 
+                scaleratio=scale_k,
                 constrain="domain",
             ),
             legend=dict(orientation="h", y=-0.18),
             plot_bgcolor="white",
             margin=dict(t=50, b=80),
         )
-        
-        # (หมายเหตุ: ลบส่วน Annotation ของ Sec A, Sec B ออกแล้ว)
-        
+
         st.plotly_chart(fig, use_container_width=True)
         col_inf1, col_inf2, col_inf3, col_inf4 = st.columns(4)
         col_inf1.info(f"Scale y:x = 1:{int(scale_k)}")
