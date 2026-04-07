@@ -506,7 +506,7 @@ try:
         h2("2.4  Allowable Stress Limits")
         tbl(["Condition","Expression","Limit (MPa)","Article"],[
             ["Transfer — Compression",         "−0.60·f'ci", f"{R['lim_tr_c']:.3f}","5.9.2.3.1a"],
-            ["Transfer — Tension (bonded)",    "+0.25·√f'ci",f"+{R['lim_tr_t']:.4f}","5.9.2.3.1b"],
+            ["Transfer — Tension (bonded)",    "+0.63·√f'ci",f"+{R['lim_tr_t']:.4f}","5.9.2.3.1b"],
             ["Service I — Comp (perm.loads)",  "−0.45·f'c",  f"{R['lim_sv_cp']:.3f}","5.9.2.3.2a"],
             ["Service I — Comp (total loads)", "−0.60·f'c",  f"{R['lim_sv_ct']:.3f}","5.9.2.3.2a"],
             ["Service III — Tension (bonded)", "+0.50·√f'c", f"+{R['lim_sv_t']:.4f}","5.9.2.3.2b"],
