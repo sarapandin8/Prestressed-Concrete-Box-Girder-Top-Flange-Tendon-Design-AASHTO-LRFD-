@@ -29,8 +29,8 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 st.set_page_config(layout="wide", page_title="PSC Box Girder — Top Flange Design")
 
 DEFAULT_SCALARS = dict(
-    width=12.0, cl_lweb=2.0, cl_rweb=10.0,
-    fc=45.0, fci=36.0, fpu=1860.0, fpy_ratio=0.90,
+    width=6.0, cl_lweb=1.50, cl_rweb=4.50,
+    fc=40.0, fci=30.0, fpu=1860.0, fpy_ratio=0.90,
     aps_strand=140.0, duct_dia_mm=70.0,
     num_tendon=2, n_strands=12,
     fpi_ratio=0.75, init_loss_pct=5, eff_ratio=0.80,
@@ -39,16 +39,16 @@ DEFAULT_SCALARS = dict(
     eng_name="Engineer Name", chk_name="Checker Name",
 )
 DEFAULT_TABLES = dict(
-    df_thickness={"x (m)": [0.00, 1.00, 2.00, 3.00, 4.00, 5.00, 6.00, 7.00, 8.00, 9.00, 10.00, 11.00, 12.00], "t (m)": [0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250]},
-    df_tendon={"x (m)": [0.00, 1.00, 2.00, 3.00, 4.00, 5.00, 6.00, 7.00, 8.00, 9.00, 10.00, 11.00, 12.00], "z_top (m)": [0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100]},
+    df_thickness={"x (m)": [0.0, 3.0, 6.0], "t (m)": [0.30, 0.25, 0.30]},
+    df_tendon={"x (m)": [0.0, 3.0, 6.0], "z_top (m)": [0.08, 0.18, 0.08]},
     df_load={
-        "x (m)":         [ 0.00, 1.00, 2.00, 3.00, 4.00, 5.00, 6.00, 7.00, 8.00, 9.00, 10.00, 11.00, 12.00],
-        "M_DL (kNm/m)":  [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
-        "V_DL (kN/m)":   [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
-        "M_SDL (kNm/m)": [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
-        "V_SDL (kN/m)":  [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
-        "M_LL (kNm/m)":  [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
-        "V_LL (kN/m)":   [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
+        "x (m)":         [ 0.0,    3.0,    6.0],
+        "M_DL (kNm/m)":  [-120.0,  80.0, -120.0],
+        "V_DL (kN/m)":   [  60.0,   0.0,   60.0],
+        "M_SDL (kNm/m)": [ -40.0,  25.0,  -40.0],
+        "V_SDL (kN/m)":  [  20.0,   0.0,   20.0],
+        "M_LL (kNm/m)":  [-180.0, 120.0, -180.0],
+        "V_LL (kN/m)":   [  80.0,   0.0,   80.0],
     },
 )
 
@@ -79,24 +79,11 @@ with st.sidebar:
     st.markdown("---")
     with st.expander("💾  Save  /  📂  Open Project", expanded=True):
 
-        # ── SAVE: robust helper — handles DataFrame, dict, or any other type
+        # ── SAVE: read editor key state (safe read-only, set by data_editor on prev rerun)
+        # Fallback to src if editor hasn't run yet (first render)
         def _tbl_save(editor_key, src_key):
-            val = st.session_state.get(editor_key)
-            if val is None:
-                val = st.session_state.get(src_key, pd.DataFrame())
-            # Normalise to DataFrame regardless of what Streamlit stored
-            try:
-                df = val if isinstance(val, pd.DataFrame) else pd.DataFrame(val)
-                for col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors="coerce")
-                df = df.dropna(how="all")
-                return df.to_dict(orient="list") if not df.empty else {}
-            except Exception:
-                # Last-resort fallback: use the stable src key
-                src = st.session_state.get(src_key, pd.DataFrame())
-                if isinstance(src, pd.DataFrame) and not src.empty:
-                    return src.to_dict(orient="list")
-                return {}
+            df = st.session_state.get(editor_key, st.session_state.get(src_key, pd.DataFrame()))
+            return df.to_dict(orient="list") if not df.empty else {}
         _save_data = {
             "scalars": {k: st.session_state[k] for k in DEFAULT_SCALARS.keys()},
             "tables": {
@@ -144,25 +131,16 @@ with st.sidebar:
                             
                 # โหลด Tables → อัปเดต src keys + ลบ editor keys ให้ reinit
                 _load_map = {"df_thickness":"thk_src","df_tendon":"tdn_src","df_load":"ld_src"}
-                loaded_tables = loaded.get("tables", {})
                 for tbl_key, src_key in _load_map.items():
-                    if tbl_key in loaded_tables:
-                        # ตรวจสอบว่าข้อมูลในตารางไม่ว่างเปล่า
-                        table_data = loaded_tables[tbl_key]
-                        if table_data:
-                            new_df = pd.DataFrame(table_data)
-                            for col in new_df.columns:
-                                new_df[col] = pd.to_numeric(new_df[col], errors="coerce")
-                            st.session_state[src_key] = new_df
-                
-                # ลบ editor key state และข้อมูลที่แก้ไขค้างไว้ เพื่อให้ data_editor ดึงค่าใหม่จาก src_key
+                    if tbl_key in loaded.get("tables", {}):
+                        new_df = pd.DataFrame(loaded["tables"][tbl_key])
+                        for col in new_df.columns:
+                            new_df[col] = pd.to_numeric(new_df[col], errors="coerce")
+                        st.session_state[src_key] = new_df
+                # ลบ editor key state → data_editor จะ reinit จาก src บน rerun ถัดไป
                 for ek in ["ed_thk", "ed_tdn", "ed_ld"]:
                     if ek in st.session_state:
                         del st.session_state[ek]
-                    # ลบข้อมูลที่ Streamlit เก็บไว้ใน widget state ภายใน (ถ้ามี)
-                    internal_key = f"{ek}_editor_state"
-                    if internal_key in st.session_state:
-                        del st.session_state[internal_key]
 
                 # ทำลาย Uploader ป้องกัน Loop
                 st.session_state["_uploader_reset"] += 1
@@ -506,7 +484,7 @@ try:
         h2("2.4  Allowable Stress Limits")
         tbl(["Condition","Expression","Limit (MPa)","Article"],[
             ["Transfer — Compression",         "−0.60·f'ci", f"{R['lim_tr_c']:.3f}","5.9.2.3.1a"],
-            ["Transfer — Tension (bonded)",    "+0.62·√f'ci",f"+{R['lim_tr_t']:.4f}","5.9.2.3.1b"],
+            ["Transfer — Tension (bonded)",    "+0.25·√f'ci",f"+{R['lim_tr_t']:.4f}","5.9.2.3.1b"],
             ["Service I — Comp (perm.loads)",  "−0.45·f'c",  f"{R['lim_sv_cp']:.3f}","5.9.2.3.2a"],
             ["Service I — Comp (total loads)", "−0.60·f'c",  f"{R['lim_sv_ct']:.3f}","5.9.2.3.2a"],
             ["Service III — Tension (bonded)", "+0.50·√f'c", f"+{R['lim_sv_t']:.4f}","5.9.2.3.2b"],
@@ -953,21 +931,22 @@ try:
     with tabs[0]:
         st.subheader("Top Flange Cross-Section with Tendon Layout")
 
-        # ── x-axis = metres (R["x"] already in m)
-        # ── y-axis = mm (depth values converted to mm)
-        x_m    = R["x"]                      # metres — used for all x coordinates
+        # ── convert to mm for display ──────────────────────────────────
+        x_mm   = R["x"] * 1000.0
         top_mm = np.zeros(N)
-        bot_mm = -R["t"]  * 1000.0
+        bot_mm = -R["t"] * 1000.0
         cg_mm  = -R["yc"] * 1000.0
-        tdn_mm = -R["z"]  * 1000.0
+        tdn_mm = -R["z"] * 1000.0
 
-        t_max_mm = float(R["t"].max()) * 1000.0
-        t_min_mm = float(R["t"].min()) * 1000.0
+        # ── dimensions in mm ────────────────────────────────────────
+        t_max_mm   = float(R["t"].max()) * 1000.0
+        t_min_mm   = float(R["t"].min()) * 1000.0
+        width_mm   = width * 1000.0
+        cl_lweb_mm = cl_lweb * 1000.0   # user-defined CL. L.Web
+        cl_rweb_mm = cl_rweb * 1000.0   # user-defined CL. R.Web
 
-        # scaleratio: 1 y-unit (mm) = scale_k x-units (m)
-        # want flange thickness ≈ 15% of visual width
-        # → scale_k = 0.15 * width[m] / t_max[m]
-        scale_k  = max(1.0, round(0.15 * width / (t_max_mm / 1000.0)))
+        # ── scaleratio: thickness ≈ 15% of visual width ──────────────
+        scale_k  = max(1.0, round(0.15 * width_mm / t_max_mm))
         y_margin = t_max_mm * 1.8
         y_range  = [-t_max_mm - y_margin, y_margin]
 
@@ -975,43 +954,47 @@ try:
 
         # Section fill
         fig.add_trace(go.Scatter(
-            x=np.concatenate([x_m, x_m[::-1]]),
+            x=np.concatenate([x_mm, x_mm[::-1]]),
             y=np.concatenate([top_mm, bot_mm[::-1]]),
             fill="toself",
             fillcolor="rgba(173, 204, 240, 0.45)",
             line=dict(color="steelblue", width=1.5),
-            name="Top Flange", hoverinfo="skip",
+            name="Top Flange",
+            hoverinfo="skip",
         ))
 
         # Section CG
         fig.add_trace(go.Scatter(
-            x=x_m, y=cg_mm, mode="lines",
+            x=x_mm, y=cg_mm,
+            mode="lines",
             line=dict(color="gray", dash="dot", width=1),
             name="Section CG",
         ))
 
-        # Tendon CGS — smooth interpolated line
+        # Tendon CGS — interpolated line (smooth curve)
         fig.add_trace(go.Scatter(
-            x=x_m, y=tdn_mm, mode="lines",
+            x=x_mm, y=tdn_mm,
+            mode="lines",
             line=dict(color="red", width=2.0),
-            name="Tendon CGS", showlegend=True,
+            name="Tendon CGS",
+            showlegend=True,
         ))
-
-        # Tendon dots — only at user-defined input stations (x in metres)
-        _tdn_prep  = prep(df_tdn)
-        tdn_dot_x  = _tdn_prep["x (m)"].values           # metres — no conversion
-        tdn_dot_y  = -_tdn_prep["z_top (m)"].values * 1000.0
+        # Tendon CGS — dots ONLY at user-defined input stations
+        tdn_dot_x = prep(df_tdn)["x (m)"].values * 1000.0
+        tdn_dot_y = -prep(df_tdn)["z_top (m)"].values * 1000.0
         fig.add_trace(go.Scatter(
-            x=tdn_dot_x, y=tdn_dot_y, mode="markers",
+            x=tdn_dot_x, y=tdn_dot_y,
+            mode="markers",
             marker=dict(color="red", size=9, symbol="circle",
                         line=dict(color="white", width=1.5)),
-            name="Tendon input pts", showlegend=True,
+            name="Tendon input pts",
+            showlegend=True,
         ))
 
-        # Flange edges — x in metres
+        # ── Flange edges (Left & Right) — cyan dashed ──────────────
         for x_edge, label, a_pos in [
-            (0.0,   "Edge L.Flange", "top right"),
-            (width, "Edge R.Flange", "top left"),
+            (0.0,      "Edge L.Flange", "top right"),
+            (width_mm, "Edge R.Flange", "top left"),
         ]:
             fig.add_vline(
                 x=x_edge,
@@ -1021,10 +1004,10 @@ try:
                 annotation_font=dict(size=10, color="rgba(0,150,150,1)"),
             )
 
-        # Web centerlines — x in metres
+        # ── Web centerlines (user-defined) — orange dashed ─────────
         for x_wf, label, a_pos in [
-            (cl_lweb, "CL. L.Web", "top right"),
-            (cl_rweb, "CL. R.Web", "top left"),
+            (cl_lweb_mm, "CL. L.Web", "top right"),
+            (cl_rweb_mm, "CL. R.Web", "top left"),
         ]:
             fig.add_vline(
                 x=x_wf,
@@ -1034,12 +1017,24 @@ try:
                 annotation_font=dict(size=10, color="rgba(200,100,0,1)"),
             )
 
+        # ── Station x-labels ────────────────────────────────────────
+        default_labels = (["Sec B (L)", "Sec A (L)", "Sec A (R)", "Sec B (R)"]
+                          if len(sta_x) == 4
+                          else [f"x={v:.1f}m" for v in sta_x])
+        for xi_m, lbl in zip(sta_x, default_labels):
+            fig.add_annotation(
+                x=xi_m*1000, y=y_range[0]*0.82,
+                text=lbl, showarrow=False,
+                font=dict(size=9, color="gray"),
+                xanchor="center",
+            )
+
         fig.update_layout(
             title="Top Flange Cross-Section with Tendon Layout",
             height=420,
             xaxis=dict(
-                title="Distance from Left Edge (m)",    # ← metres
-                range=[-width * 0.04, width * 1.04],   # ← metres
+                title="Distance from Left Edge (mm)",
+                range=[-width_mm*0.04, width_mm*1.04],
                 showgrid=True, gridcolor="rgba(200,200,200,0.4)",
             ),
             yaxis=dict(
@@ -1059,8 +1054,8 @@ try:
         col_inf1, col_inf2, col_inf3, col_inf4 = st.columns(4)
         col_inf1.info(f"Scale y:x = 1:{int(scale_k)}")
         col_inf2.info(f"t_min = {t_min_mm:.0f} mm")
-        col_inf3.info(f"CL.L.Web = {cl_lweb:.3f} m")
-        col_inf4.info(f"CL.R.Web = {cl_rweb:.3f} m")
+        col_inf3.info(f"CL.L.Web = {cl_lweb*1000:.0f} mm")
+        col_inf4.info(f"CL.R.Web = {cl_rweb*1000:.0f} mm")
 
         c1, c2, c3 = st.columns(3)
         c1.metric("Aps (1m strip)", f"{R['Aps']*1e6:.2f} mm²")
@@ -1076,7 +1071,7 @@ try:
         fig2.add_hline(y=R["lim_tr_c"], line_dash="dash", line_color="orange",
                        annotation_text=f"−0.60f'ci = {R['lim_tr_c']:.2f} MPa")
         fig2.add_hline(y=R["lim_tr_t"], line_dash="dash", line_color="green",
-                       annotation_text=f"+0.62√f'ci = +{R['lim_tr_t']:.3f} MPa")
+                       annotation_text=f"+0.25√f'ci = +{R['lim_tr_t']:.3f} MPa")
         fig2.update_layout(height=380, xaxis_title="x (m)", yaxis_title="Stress (MPa)")
         st.plotly_chart(fig2, use_container_width=True)
         rows_tr = [{"x (m)": f"{R['x'][i]:.2f}",
