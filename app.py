@@ -29,13 +29,13 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 st.set_page_config(layout="wide", page_title="PSC Box Girder — Top Flange Design")
 
 DEFAULT_SCALARS = dict(
-    width=12.0, cl_lweb=2.00, cl_rweb=10.00,
+    width=12.0, cl_lweb=2.0, cl_rweb=10.0,
     fc=45.0, fci=36.0, fpu=1860.0, fpy_ratio=0.90,
     aps_strand=140.0, duct_dia_mm=70.0,
     num_tendon=1, n_strands=5,
     fpi_ratio=0.75, init_loss_pct=5, eff_ratio=0.80,
     phi_flex=1.00, phi_shear=0.90,
-    proj_name="Bridge Lane Expansion", doc_no="CALC-STR-001",
+    proj_name="Box Girder Design", doc_no="CALC-STR-001",
     eng_name="Engineer Name", chk_name="Checker Name",
 )
 DEFAULT_TABLES = dict(
@@ -953,20 +953,19 @@ try:
     with tabs[0]:
         st.subheader("Top Flange Cross-Section with Tendon Layout")
 
-        # ── x-axis = metres (R["x"] already in m)
-        # ── y-axis = mm (depth values converted to mm)
-        x_m    = R["x"]                      # metres — used for all x coordinates
-        top_mm = np.zeros(N)
-        bot_mm = -R["t"]  * 1000.0
+        # ── x-axis in metres, y-axis in mm ─────────────────────────────
+        x_m    = R["x"]                    # metres (unchanged)
+        top_mm = np.zeros(N)               # y in mm
+        bot_mm = -R["t"] * 1000.0
         cg_mm  = -R["yc"] * 1000.0
-        tdn_mm = -R["z"]  * 1000.0
+        tdn_mm = -R["z"] * 1000.0
 
         t_max_mm = float(R["t"].max()) * 1000.0
         t_min_mm = float(R["t"].min()) * 1000.0
 
         # scaleratio: 1 y-unit (mm) = scale_k x-units (m)
-        # want flange thickness ≈ 15% of visual width
-        # → scale_k = 0.15 * width[m] / t_max[m]
+        # target: flange thickness ≈ 15% of visual width
+        # scale_k = (0.15 * width_m) / (t_max_mm / 1000)  → unitless ratio
         scale_k  = max(1.0, round(0.15 * width / (t_max_mm / 1000.0)))
         y_margin = t_max_mm * 1.8
         y_range  = [-t_max_mm - y_margin, y_margin]
@@ -990,17 +989,17 @@ try:
             name="Section CG",
         ))
 
-        # Tendon CGS — smooth interpolated line
+        # Tendon CGS — smooth line
         fig.add_trace(go.Scatter(
             x=x_m, y=tdn_mm, mode="lines",
             line=dict(color="red", width=2.0),
             name="Tendon CGS", showlegend=True,
         ))
 
-        # Tendon dots — only at user-defined input stations (x in metres)
-        _tdn_prep  = prep(df_tdn)
-        tdn_dot_x  = _tdn_prep["x (m)"].values           # metres — no conversion
-        tdn_dot_y  = -_tdn_prep["z_top (m)"].values * 1000.0
+        # Tendon dots — input stations only
+        _tdn_prep = prep(df_tdn)
+        tdn_dot_x = _tdn_prep["x (m)"].values          # metres
+        tdn_dot_y = -_tdn_prep["z_top (m)"].values * 1000.0
         fig.add_trace(go.Scatter(
             x=tdn_dot_x, y=tdn_dot_y, mode="markers",
             marker=dict(color="red", size=9, symbol="circle",
@@ -1008,7 +1007,7 @@ try:
             name="Tendon input pts", showlegend=True,
         ))
 
-        # Flange edges — x in metres
+        # Flange edges — cyan dotted
         for x_edge, label, a_pos in [
             (0.0,   "Edge L.Flange", "top right"),
             (width, "Edge R.Flange", "top left"),
@@ -1021,7 +1020,7 @@ try:
                 annotation_font=dict(size=10, color="rgba(0,150,150,1)"),
             )
 
-        # Web centerlines — x in metres
+        # Web centerlines — orange dashed
         for x_wf, label, a_pos in [
             (cl_lweb, "CL. L.Web", "top right"),
             (cl_rweb, "CL. R.Web", "top left"),
@@ -1034,21 +1033,20 @@ try:
                 annotation_font=dict(size=10, color="rgba(200,100,0,1)"),
             )
 
+        # No station x-labels (removed as requested)
+
         fig.update_layout(
             title="Top Flange Cross-Section with Tendon Layout",
             height=420,
             xaxis=dict(
-                title="Distance from Left Edge (m)",    # ← metres
-                range=[-width * 0.04, width * 1.04],   # ← metres
+                title="Distance from Left Edge (m)",
+                range=[-width*0.04, width*1.04],
                 showgrid=True, gridcolor="rgba(200,200,200,0.4)",
             ),
             yaxis=dict(
                 title="Depth (mm)",
                 range=y_range,
-                showgrid=True, gridcolor="rgba(200,200,200,0.4)",
-                scaleanchor="x",
-                scaleratio=scale_k,
-                constrain="domain",
+                showgrid=True, gridcolor="rgba(200,200,200,0.4)"
             ),
             legend=dict(orientation="h", y=-0.18),
             plot_bgcolor="white",
@@ -1059,8 +1057,8 @@ try:
         col_inf1, col_inf2, col_inf3, col_inf4 = st.columns(4)
         col_inf1.info(f"Scale y:x = 1:{int(scale_k)}")
         col_inf2.info(f"t_min = {t_min_mm:.0f} mm")
-        col_inf3.info(f"CL.L.Web = {cl_lweb:.3f} m")
-        col_inf4.info(f"CL.R.Web = {cl_rweb:.3f} m")
+        col_inf3.info(f"CL.L.Web = {cl_lweb:.2f} m")
+        col_inf4.info(f"CL.R.Web = {cl_rweb:.2f} m")
 
         c1, c2, c3 = st.columns(3)
         c1.metric("Aps (1m strip)", f"{R['Aps']*1e6:.2f} mm²")
