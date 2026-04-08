@@ -29,26 +29,26 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 st.set_page_config(layout="wide", page_title="PSC Box Girder — Top Flange Design")
 
 DEFAULT_SCALARS = dict(
-    width=12.0, cl_lweb=2.0, cl_rweb=10.0,
-    fc=45.0, fci=36.0, fpu=1860.0, fpy_ratio=0.90,
+    width=6.0, cl_lweb=1.50, cl_rweb=4.50,
+    fc=40.0, fci=30.0, fpu=1860.0, fpy_ratio=0.90,
     aps_strand=140.0, duct_dia_mm=70.0,
-    num_tendon=1, n_strands=5,
+    num_tendon=2, n_strands=12,
     fpi_ratio=0.75, init_loss_pct=5, eff_ratio=0.80,
     phi_flex=1.00, phi_shear=0.90,
-    proj_name="Box Girder Design", doc_no="CALC-STR-001",
+    proj_name="Bridge Lane Expansion", doc_no="CALC-STR-001",
     eng_name="Engineer Name", chk_name="Checker Name",
 )
 DEFAULT_TABLES = dict(
-    df_thickness={"x (m)": [0.00, 1.00, 2.00, 3.00, 4.00, 5.00, 6.00, 7.00, 8.00, 9.00, 10.00, 11.00, 12.00], "t (m)": [0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250]},
-    df_tendon={"x (m)": [0.00, 1.00, 2.00, 3.00, 4.00, 5.00, 6.00, 7.00, 8.00, 9.00, 10.00, 11.00, 12.00], "z_top (m)": [0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100]},
+    df_thickness={"x (m)": [0.0, 3.0, 6.0], "t (m)": [0.30, 0.25, 0.30]},
+    df_tendon={"x (m)": [0.0, 3.0, 6.0], "z_top (m)": [0.08, 0.18, 0.08]},
     df_load={
-        "x (m)":         [ 0.00, 1.00, 2.00, 3.00, 4.00, 5.00, 6.00, 7.00, 8.00, 9.00, 10.00, 11.00, 12.00],
-        "M_DL (kNm/m)":  [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
-        "V_DL (kN/m)":   [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
-        "M_SDL (kNm/m)": [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
-        "V_SDL (kN/m)":  [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
-        "M_LL (kNm/m)":  [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
-        "V_LL (kN/m)":   [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
+        "x (m)":         [ 0.0,    3.0,    6.0],
+        "M_DL (kNm/m)":  [-120.0,  80.0, -120.0],
+        "V_DL (kN/m)":   [  60.0,   0.0,   60.0],
+        "M_SDL (kNm/m)": [ -40.0,  25.0,  -40.0],
+        "V_SDL (kN/m)":  [  20.0,   0.0,   20.0],
+        "M_LL (kNm/m)":  [-180.0, 120.0, -180.0],
+        "V_LL (kN/m)":   [  80.0,   0.0,   80.0],
     },
 )
 
@@ -1046,7 +1046,10 @@ try:
             yaxis=dict(
                 title="Depth (mm)",
                 range=y_range,
-                showgrid=True, gridcolor="rgba(200,200,200,0.4)"
+                showgrid=True, gridcolor="rgba(200,200,200,0.4)",
+                scaleanchor="x",
+                scaleratio=scale_k,
+                constrain="domain",
             ),
             legend=dict(orientation="h", y=-0.18),
             plot_bgcolor="white",
