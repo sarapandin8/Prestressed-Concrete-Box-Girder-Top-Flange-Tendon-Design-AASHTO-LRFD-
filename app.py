@@ -32,10 +32,10 @@ DEFAULT_SCALARS = dict(
     width=12.0, cl_lweb=2.0, cl_rweb=10.0,
     fc=45.0, fci=36.0, fpu=1860.0, fpy_ratio=0.90,
     aps_strand=140.0, duct_dia_mm=70.0,
-    num_tendon=2, n_strands=12,
+    num_tendon=1, n_strands=5,
     fpi_ratio=0.75, init_loss_pct=5, eff_ratio=0.80,
     phi_flex=1.00, phi_shear=0.90,
-    proj_name="Bridge Lane Expansion", doc_no="CALC-STR-001",
+    proj_name="Box Girder Design", doc_no="CALC-STR-001",
     eng_name="Engineer Name", chk_name="Checker Name",
 )
 DEFAULT_TABLES = dict(
@@ -57,20 +57,18 @@ for k, v in DEFAULT_SCALARS.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# ── Init table source keys (thk_src, tdn_src, ld_src)
-# These are the data= parameter for data_editor (separate from widget key)
+# ── Init table SOURCE keys (never same as editor widget key)
+# Rule: data_editor(data=session_state["thk_src"], key="ed_thk")
+#   - thk_src = stable data source, only changes on file load
+#   - ed_thk  = widget internal state managed by Streamlit (never write to it)
+# This prevents StreamlitValueAssignmentNotAllowedError AND double-input issue
 _TABLE_SRC = {"thk_src": "df_thickness", "tdn_src": "df_tendon", "ld_src": "df_load"}
 for src_key, tbl_key in _TABLE_SRC.items():
     if src_key not in st.session_state:
         st.session_state[src_key] = pd.DataFrame(DEFAULT_TABLES[tbl_key])
 
-# _tbl_ver: incremented on file load → changes data_editor key → forces reinit from new src
-if "_tbl_ver" not in st.session_state:
-    st.session_state["_tbl_ver"] = 0
-
-# _loaded_hash: prevents rerun loop for static uploader key
-if "_loaded_hash" not in st.session_state:
-    st.session_state["_loaded_hash"] = None
+if "_uploader_reset" not in st.session_state:
+    st.session_state["_uploader_reset"] = 0
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -81,86 +79,97 @@ with st.sidebar:
     st.markdown("---")
     with st.expander("💾  Save  /  📂  Open Project", expanded=True):
 
-        # ── SAVE ─────────────────────────────────────────────────────────
-        # Save reads from _cur_thk/_cur_tdn/_cur_ld
-        # These are the return values of data_editor (set later in Section 3 of PREVIOUS rerun)
-        # → guaranteed plain DataFrame of whatever user has entered
-        def _df_to_dict(cur_key, src_key):
-            """Read current table: prefer _cur_* (user-edited), fallback to src (after load)."""
-            df = st.session_state.get(cur_key,
-                 st.session_state.get(src_key, pd.DataFrame()))
-            if not isinstance(df, pd.DataFrame):
-                try:    df = pd.DataFrame(df)
-                except: return {}
-            for col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors="coerce")
-            df = df.dropna(how="all")
-            return df.to_dict(orient="list") if not df.empty else {}
-
+        # ── SAVE: robust helper — handles DataFrame, dict, or any other type
+        def _tbl_save(editor_key, src_key):
+            val = st.session_state.get(editor_key)
+            if val is None:
+                val = st.session_state.get(src_key, pd.DataFrame())
+            # Normalise to DataFrame regardless of what Streamlit stored
+            try:
+                df = val if isinstance(val, pd.DataFrame) else pd.DataFrame(val)
+                for col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors="coerce")
+                df = df.dropna(how="all")
+                return df.to_dict(orient="list") if not df.empty else {}
+            except Exception:
+                # Last-resort fallback: use the stable src key
+                src = st.session_state.get(src_key, pd.DataFrame())
+                if isinstance(src, pd.DataFrame) and not src.empty:
+                    return src.to_dict(orient="list")
+                return {}
         _save_data = {
-            "scalars": {k: st.session_state[k] for k in DEFAULT_SCALARS},
+            "scalars": {k: st.session_state[k] for k in DEFAULT_SCALARS.keys()},
             "tables": {
-                "df_thickness": _df_to_dict("_cur_thk", "thk_src"),
-                "df_tendon":    _df_to_dict("_cur_tdn", "tdn_src"),
-                "df_load":      _df_to_dict("_cur_ld",  "ld_src"),
+                "df_thickness": _tbl_save("ed_thk", "thk_src"),
+                "df_tendon":    _tbl_save("ed_tdn", "tdn_src"),
+                "df_load":      _tbl_save("ed_ld",  "ld_src"),
             },
         }
         _json_bytes = json.dumps(_save_data, indent=2, ensure_ascii=False).encode("utf-8")
         _fname = f"{st.session_state.proj_name.replace(' ','_')}_{st.session_state.doc_no}.json"
+
         st.download_button(
             label="💾  Save Project  (.json)",
-            data=_json_bytes, file_name=_fname,
-            mime="application/json", use_container_width=True,
+            data=_json_bytes,
+            file_name=_fname,
+            mime="application/json",
+            use_container_width=True,
         )
-        st.caption("ตั้ง Chrome: Settings → Downloads → 'Ask where to save'")
+        st.caption("ตั้ง Chrome: Settings→Downloads→'Ask where to save' เพื่อเลือก folder เอง")
         st.markdown("---")
 
-        # ── OPEN ─────────────────────────────────────────────────────────
-        # Static key "proj_uploader": file always reaches handler (never disappears)
-        # Hash check: only process once per unique file (prevents rerun loop)
+        # ── OPEN: โหลดและจัดระเบียบ Type ป้องกัน Slider/Number_input Crash ──
+        _up_key = f"uploader_{st.session_state['_uploader_reset']}"
         uploaded_file = st.file_uploader(
-            "📂  Open Project  (.json)", type="json",
-            key="proj_uploader", help="เลือกไฟล์ .json ที่เคย Save ไว้",
+            "📂  Open Project  (.json)",
+            type="json",
+            key=_up_key,
+            help="เลือกไฟล์ .json ที่เคย Save ไว้",
         )
+        
         if uploaded_file is not None:
-            _raw = uploaded_file.getvalue()           # bytes, stable across reruns
-            _fhash = hash(_raw)
-            if st.session_state["_loaded_hash"] != _fhash:
-                try:
-                    loaded = json.loads(_raw.decode("utf-8"))
+            try:
+                loaded = json.loads(uploaded_file.read().decode("utf-8"))
+                
+                # โหลด Scalars พร้อมจับคู่ Type
+                for k, v in loaded.get("scalars", {}).items():
+                    if k in DEFAULT_SCALARS:
+                        def_val = DEFAULT_SCALARS[k]
+                        if isinstance(def_val, int):
+                            st.session_state[k] = int(v)
+                        elif isinstance(def_val, float):
+                            st.session_state[k] = float(v)
+                        else:
+                            st.session_state[k] = str(v)
+                            
+                # โหลด Tables → อัปเดต src keys + ลบ editor keys ให้ reinit
+                _load_map = {"df_thickness":"thk_src","df_tendon":"tdn_src","df_load":"ld_src"}
+                loaded_tables = loaded.get("tables", {})
+                for tbl_key, src_key in _load_map.items():
+                    if tbl_key in loaded_tables:
+                        # ตรวจสอบว่าข้อมูลในตารางไม่ว่างเปล่า
+                        table_data = loaded_tables[tbl_key]
+                        if table_data:
+                            new_df = pd.DataFrame(table_data)
+                            for col in new_df.columns:
+                                new_df[col] = pd.to_numeric(new_df[col], errors="coerce")
+                            st.session_state[src_key] = new_df
+                
+                # ลบ editor key state และข้อมูลที่แก้ไขค้างไว้ เพื่อให้ data_editor ดึงค่าใหม่จาก src_key
+                for ek in ["ed_thk", "ed_tdn", "ed_ld"]:
+                    if ek in st.session_state:
+                        del st.session_state[ek]
+                    # ลบข้อมูลที่ Streamlit เก็บไว้ใน widget state ภายใน (ถ้ามี)
+                    internal_key = f"{ek}_editor_state"
+                    if internal_key in st.session_state:
+                        del st.session_state[internal_key]
 
-                    # Load scalars
-                    for k, v in loaded.get("scalars", {}).items():
-                        if k in DEFAULT_SCALARS:
-                            dv = DEFAULT_SCALARS[k]
-                            st.session_state[k] = (
-                                int(v)   if isinstance(dv, int)   else
-                                float(v) if isinstance(dv, float) else str(v)
-                            )
-
-                    # Load tables → update thk_src/tdn_src/ld_src
-                    _lmap = {"df_thickness":"thk_src","df_tendon":"tdn_src","df_load":"ld_src"}
-                    for tbl_key, src_key in _lmap.items():
-                        raw_tbl = loaded.get("tables", {}).get(tbl_key)
-                        if raw_tbl:
-                            ndf = pd.DataFrame(raw_tbl)
-                            for col in ndf.columns:
-                                ndf[col] = pd.to_numeric(ndf[col], errors="coerce")
-                            st.session_state[src_key] = ndf.dropna(how="all")
-
-                    # KEY FIX: increment _tbl_ver → data_editor keys change
-                    # → widgets reinitialise from updated thk_src etc.
-                    # (simply deleting ed_thk is NOT enough — Streamlit caches widget state)
-                    st.session_state["_tbl_ver"] += 1
-                    # Clear cached current-edit values (from previous session)
-                    for k in ["_cur_thk", "_cur_tdn", "_cur_ld"]:
-                        st.session_state.pop(k, None)
-
-                    st.session_state["_loaded_hash"] = _fhash
-                    st.success("✅  Project loaded successfully!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"❌  Load error: {e}")
+                # ทำลาย Uploader ป้องกัน Loop
+                st.session_state["_uploader_reset"] += 1
+                st.success("✅  Project loaded successfully!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌  Load error: {e}")
     # ── 📐 Materials & Section ───────────────────────────────────────────────
     with st.expander("📐 Materials & Section", expanded=True):
         # ใช้ key=... อย่างเดียว Streamlit จะซิงค์ค่าให้เอง และไม่ค้างตอนโหลด
@@ -217,33 +226,17 @@ st.title("🏗️  PSC Box Girder — Top Flange Transverse Design")
 st.caption("AASHTO LRFD  |  1.0 m transverse strip  |  "
            "Compression (−)  Tension (+)  |  +M = sagging")
 
-# _tbl_ver changes on file load → editor keys change → widgets reinit from updated src
-_v = st.session_state["_tbl_ver"]
-
 c1, c2 = st.columns(2)
 with c1:
     st.subheader("📏 Flange Thickness t(x)")
-    # key includes version → brand-new widget after load → reads fresh from thk_src
-    df_thk = st.data_editor(
-        st.session_state["thk_src"], num_rows="dynamic",
-        key=f"ed_thk_{_v}"
-    )
-    # Store return value in _cur_thk (safe non-widget key) → used by Save block
-    st.session_state["_cur_thk"] = df_thk
-
+    # Pass src key (stable, never same object as widget key) → no reset → single input works
+    df_thk = st.data_editor(st.session_state["thk_src"], num_rows="dynamic", key="ed_thk")
     st.subheader("🔩 Tendon Profile z(x)  [from top face]")
-    df_tdn = st.data_editor(
-        st.session_state["tdn_src"], num_rows="dynamic",
-        key=f"ed_tdn_{_v}"
-    )
-    st.session_state["_cur_tdn"] = df_tdn
+    df_tdn = st.data_editor(st.session_state["tdn_src"], num_rows="dynamic", key="ed_tdn")
 with c2:
     st.subheader("📦 Loads per 1 m strip")
-    df_ld = st.data_editor(
-        st.session_state["ld_src"], num_rows="dynamic",
-        key=f"ed_ld_{_v}"
-    )
-    st.session_state["_cur_ld"] = df_ld
+    df_ld  = st.data_editor(st.session_state["ld_src"],  num_rows="dynamic", key="ed_ld")
+# No sync-back: Streamlit forbids writing to widget key; data_editor manages ed_thk etc.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 4.  CALCULATION ENGINE
@@ -960,22 +953,20 @@ try:
     with tabs[0]:
         st.subheader("Top Flange Cross-Section with Tendon Layout")
 
-        # ── convert to mm for display ──────────────────────────────────
-        x_mm   = R["x"] * 1000.0
-        top_mm = np.zeros(N)
+        # ── x-axis in metres, y-axis in mm ─────────────────────────────
+        x_m    = R["x"]                    # metres (unchanged)
+        top_mm = np.zeros(N)               # y in mm
         bot_mm = -R["t"] * 1000.0
         cg_mm  = -R["yc"] * 1000.0
         tdn_mm = -R["z"] * 1000.0
 
-        # ── dimensions in mm ────────────────────────────────────────
-        t_max_mm   = float(R["t"].max()) * 1000.0
-        t_min_mm   = float(R["t"].min()) * 1000.0
-        width_mm   = width * 1000.0
-        cl_lweb_mm = cl_lweb * 1000.0   # user-defined CL. L.Web
-        cl_rweb_mm = cl_rweb * 1000.0   # user-defined CL. R.Web
+        t_max_mm = float(R["t"].max()) * 1000.0
+        t_min_mm = float(R["t"].min()) * 1000.0
 
-        # ── scaleratio: thickness ≈ 15% of visual width ──────────────
-        scale_k  = max(1.0, round(0.15 * width_mm / t_max_mm))
+        # scaleratio: 1 y-unit (mm) = scale_k x-units (m)
+        # target: flange thickness ≈ 15% of visual width
+        # scale_k = (0.15 * width_m) / (t_max_mm / 1000)  → unitless ratio
+        scale_k  = max(1.0, round(0.15 * width / (t_max_mm / 1000.0)))
         y_margin = t_max_mm * 1.8
         y_range  = [-t_max_mm - y_margin, y_margin]
 
@@ -983,47 +974,43 @@ try:
 
         # Section fill
         fig.add_trace(go.Scatter(
-            x=np.concatenate([x_mm, x_mm[::-1]]),
+            x=np.concatenate([x_m, x_m[::-1]]),
             y=np.concatenate([top_mm, bot_mm[::-1]]),
             fill="toself",
             fillcolor="rgba(173, 204, 240, 0.45)",
             line=dict(color="steelblue", width=1.5),
-            name="Top Flange",
-            hoverinfo="skip",
+            name="Top Flange", hoverinfo="skip",
         ))
 
         # Section CG
         fig.add_trace(go.Scatter(
-            x=x_mm, y=cg_mm,
-            mode="lines",
+            x=x_m, y=cg_mm, mode="lines",
             line=dict(color="gray", dash="dot", width=1),
             name="Section CG",
         ))
 
-        # Tendon CGS — interpolated line (smooth curve)
+        # Tendon CGS — smooth line
         fig.add_trace(go.Scatter(
-            x=x_mm, y=tdn_mm,
-            mode="lines",
+            x=x_m, y=tdn_mm, mode="lines",
             line=dict(color="red", width=2.0),
-            name="Tendon CGS",
-            showlegend=True,
-        ))
-        # Tendon CGS — dots ONLY at user-defined input stations
-        tdn_dot_x = prep(df_tdn)["x (m)"].values * 1000.0
-        tdn_dot_y = -prep(df_tdn)["z_top (m)"].values * 1000.0
-        fig.add_trace(go.Scatter(
-            x=tdn_dot_x, y=tdn_dot_y,
-            mode="markers",
-            marker=dict(color="red", size=9, symbol="circle",
-                        line=dict(color="white", width=1.5)),
-            name="Tendon input pts",
-            showlegend=True,
+            name="Tendon CGS", showlegend=True,
         ))
 
-        # ── Flange edges (Left & Right) — cyan dashed ──────────────
+        # Tendon dots — input stations only
+        _tdn_prep = prep(df_tdn)
+        tdn_dot_x = _tdn_prep["x (m)"].values          # metres
+        tdn_dot_y = -_tdn_prep["z_top (m)"].values * 1000.0
+        fig.add_trace(go.Scatter(
+            x=tdn_dot_x, y=tdn_dot_y, mode="markers",
+            marker=dict(color="red", size=9, symbol="circle",
+                        line=dict(color="white", width=1.5)),
+            name="Tendon input pts", showlegend=True,
+        ))
+
+        # Flange edges — cyan dotted
         for x_edge, label, a_pos in [
-            (0.0,      "Edge L.Flange", "top right"),
-            (width_mm, "Edge R.Flange", "top left"),
+            (0.0,   "Edge L.Flange", "top right"),
+            (width, "Edge R.Flange", "top left"),
         ]:
             fig.add_vline(
                 x=x_edge,
@@ -1033,10 +1020,10 @@ try:
                 annotation_font=dict(size=10, color="rgba(0,150,150,1)"),
             )
 
-        # ── Web centerlines (user-defined) — orange dashed ─────────
+        # Web centerlines — orange dashed
         for x_wf, label, a_pos in [
-            (cl_lweb_mm, "CL. L.Web", "top right"),
-            (cl_rweb_mm, "CL. R.Web", "top left"),
+            (cl_lweb, "CL. L.Web", "top right"),
+            (cl_rweb, "CL. R.Web", "top left"),
         ]:
             fig.add_vline(
                 x=x_wf,
@@ -1046,24 +1033,14 @@ try:
                 annotation_font=dict(size=10, color="rgba(200,100,0,1)"),
             )
 
-        # ── Station x-labels ────────────────────────────────────────
-        default_labels = (["Sec B (L)", "Sec A (L)", "Sec A (R)", "Sec B (R)"]
-                          if len(sta_x) == 4
-                          else [f"x={v:.1f}m" for v in sta_x])
-        for xi_m, lbl in zip(sta_x, default_labels):
-            fig.add_annotation(
-                x=xi_m*1000, y=y_range[0]*0.82,
-                text=lbl, showarrow=False,
-                font=dict(size=9, color="gray"),
-                xanchor="center",
-            )
+        # No station x-labels (removed as requested)
 
         fig.update_layout(
             title="Top Flange Cross-Section with Tendon Layout",
             height=420,
             xaxis=dict(
-                title="Distance from Left Edge (mm)",
-                range=[-width_mm*0.04, width_mm*1.04],
+                title="Distance from Left Edge (m)",
+                range=[-width*0.04, width*1.04],
                 showgrid=True, gridcolor="rgba(200,200,200,0.4)",
             ),
             yaxis=dict(
@@ -1083,8 +1060,8 @@ try:
         col_inf1, col_inf2, col_inf3, col_inf4 = st.columns(4)
         col_inf1.info(f"Scale y:x = 1:{int(scale_k)}")
         col_inf2.info(f"t_min = {t_min_mm:.0f} mm")
-        col_inf3.info(f"CL.L.Web = {cl_lweb*1000:.0f} mm")
-        col_inf4.info(f"CL.R.Web = {cl_rweb*1000:.0f} mm")
+        col_inf3.info(f"CL.L.Web = {cl_lweb:.2f} m")
+        col_inf4.info(f"CL.R.Web = {cl_rweb:.2f} m")
 
         c1, c2, c3 = st.columns(3)
         c1.metric("Aps (1m strip)", f"{R['Aps']*1e6:.2f} mm²")
