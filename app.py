@@ -1046,10 +1046,7 @@ try:
             yaxis=dict(
                 title="Depth (mm)",
                 range=y_range,
-                showgrid=True, gridcolor="rgba(200,200,200,0.4)",
-                scaleanchor="x",
-                scaleratio=scale_k,
-                constrain="domain",
+                showgrid=True, gridcolor="rgba(200,200,200,0.4)"
             ),
             legend=dict(orientation="h", y=-0.18),
             plot_bgcolor="white",
