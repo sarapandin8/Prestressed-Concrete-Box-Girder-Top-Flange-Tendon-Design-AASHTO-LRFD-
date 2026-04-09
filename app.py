@@ -67,13 +67,8 @@ for src_key, tbl_key in _TABLE_SRC.items():
     if src_key not in st.session_state:
         st.session_state[src_key] = pd.DataFrame(DEFAULT_TABLES[tbl_key])
 
-# _tbl_ver: increment after file load → editor key เปลี่ยน → widget reinit จาก src ใหม่
-if "_tbl_ver" not in st.session_state:
-    st.session_state["_tbl_ver"] = 0
-
-# _loaded_hash: ป้องกัน rerun loop เมื่อใช้ static uploader key
-if "_loaded_hash" not in st.session_state:
-    st.session_state["_loaded_hash"] = None
+if "_uploader_reset" not in st.session_state:
+    st.session_state["_uploader_reset"] = 0
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -84,84 +79,97 @@ with st.sidebar:
     st.markdown("---")
     with st.expander("💾  Save  /  📂  Open Project", expanded=True):
 
-        # ── SAVE ─────────────────────────────────────────────────────────────
-        # อ่านจาก _cur_thk/_cur_tdn/_cur_ld ซึ่งเป็น return value ของ data_editor
-        # (plain DataFrame ที่ user เห็นบนหน้าจออยู่จริงๆ)
-        # thk_src ใช้เป็น fallback กรณียังไม่เคย interact กับ editor
-        def _tbl_to_dict(cur_key, src_key):
-            df = st.session_state.get(cur_key,
-                 st.session_state.get(src_key, pd.DataFrame()))
-            if not isinstance(df, pd.DataFrame):
-                try:    df = pd.DataFrame(df)
-                except: return {}
-            for col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors="coerce")
-            df = df.dropna(how="all")
-            return df.to_dict(orient="list") if not df.empty else {}
-
+        # ── SAVE: robust helper — handles DataFrame, dict, or any other type
+        def _tbl_save(editor_key, src_key):
+            val = st.session_state.get(editor_key)
+            if val is None:
+                val = st.session_state.get(src_key, pd.DataFrame())
+            # Normalise to DataFrame regardless of what Streamlit stored
+            try:
+                df = val if isinstance(val, pd.DataFrame) else pd.DataFrame(val)
+                for col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors="coerce")
+                df = df.dropna(how="all")
+                return df.to_dict(orient="list") if not df.empty else {}
+            except Exception:
+                # Last-resort fallback: use the stable src key
+                src = st.session_state.get(src_key, pd.DataFrame())
+                if isinstance(src, pd.DataFrame) and not src.empty:
+                    return src.to_dict(orient="list")
+                return {}
         _save_data = {
-            "scalars": {k: st.session_state[k] for k in DEFAULT_SCALARS},
+            "scalars": {k: st.session_state[k] for k in DEFAULT_SCALARS.keys()},
             "tables": {
-                "df_thickness": _tbl_to_dict("_cur_thk", "thk_src"),
-                "df_tendon":    _tbl_to_dict("_cur_tdn", "tdn_src"),
-                "df_load":      _tbl_to_dict("_cur_ld",  "ld_src"),
+                "df_thickness": _tbl_save("ed_thk", "thk_src"),
+                "df_tendon":    _tbl_save("ed_tdn", "tdn_src"),
+                "df_load":      _tbl_save("ed_ld",  "ld_src"),
             },
         }
         _json_bytes = json.dumps(_save_data, indent=2, ensure_ascii=False).encode("utf-8")
         _fname = f"{st.session_state.proj_name.replace(' ','_')}_{st.session_state.doc_no}.json"
+
         st.download_button(
             label="💾  Save Project  (.json)",
-            data=_json_bytes, file_name=_fname,
-            mime="application/json", use_container_width=True,
+            data=_json_bytes,
+            file_name=_fname,
+            mime="application/json",
+            use_container_width=True,
         )
-        st.caption("ตั้ง Chrome: Settings → Downloads → 'Ask where to save'")
+        st.caption("ตั้ง Chrome: Settings→Downloads→'Ask where to save' เพื่อเลือก folder เอง")
         st.markdown("---")
 
-        # ── OPEN ─────────────────────────────────────────────────────────────
-        # Static key "proj_uploader" → ไฟล์ถึง handler เสมอ ไม่หายระหว่าง rerun
-        # Hash check → process แค่ครั้งเดียวต่อไฟล์ ไม่เกิด loop
+        # ── OPEN: โหลดและจัดระเบียบ Type ป้องกัน Slider/Number_input Crash ──
+        _up_key = f"uploader_{st.session_state['_uploader_reset']}"
         uploaded_file = st.file_uploader(
-            "📂  Open Project  (.json)", type="json",
-            key="proj_uploader",
+            "📂  Open Project  (.json)",
+            type="json",
+            key=_up_key,
             help="เลือกไฟล์ .json ที่เคย Save ไว้",
         )
+        
         if uploaded_file is not None:
-            _raw   = uploaded_file.getvalue()        # bytes — stable ข้ามทุก rerun
-            _fhash = hash(_raw)
-            if st.session_state["_loaded_hash"] != _fhash:
-                try:
-                    loaded = json.loads(_raw.decode("utf-8"))
+            try:
+                loaded = json.loads(uploaded_file.read().decode("utf-8"))
+                
+                # โหลด Scalars พร้อมจับคู่ Type
+                for k, v in loaded.get("scalars", {}).items():
+                    if k in DEFAULT_SCALARS:
+                        def_val = DEFAULT_SCALARS[k]
+                        if isinstance(def_val, int):
+                            st.session_state[k] = int(v)
+                        elif isinstance(def_val, float):
+                            st.session_state[k] = float(v)
+                        else:
+                            st.session_state[k] = str(v)
+                            
+                # โหลด Tables → อัปเดต src keys + ลบ editor keys ให้ reinit
+                _load_map = {"df_thickness":"thk_src","df_tendon":"tdn_src","df_load":"ld_src"}
+                loaded_tables = loaded.get("tables", {})
+                for tbl_key, src_key in _load_map.items():
+                    if tbl_key in loaded_tables:
+                        # ตรวจสอบว่าข้อมูลในตารางไม่ว่างเปล่า
+                        table_data = loaded_tables[tbl_key]
+                        if table_data:
+                            new_df = pd.DataFrame(table_data)
+                            for col in new_df.columns:
+                                new_df[col] = pd.to_numeric(new_df[col], errors="coerce")
+                            st.session_state[src_key] = new_df
+                
+                # ลบ editor key state และข้อมูลที่แก้ไขค้างไว้ เพื่อให้ data_editor ดึงค่าใหม่จาก src_key
+                for ek in ["ed_thk", "ed_tdn", "ed_ld"]:
+                    if ek in st.session_state:
+                        del st.session_state[ek]
+                    # ลบข้อมูลที่ Streamlit เก็บไว้ใน widget state ภายใน (ถ้ามี)
+                    internal_key = f"{ek}_editor_state"
+                    if internal_key in st.session_state:
+                        del st.session_state[internal_key]
 
-                    # Load scalars พร้อม type matching
-                    for k, v in loaded.get("scalars", {}).items():
-                        if k in DEFAULT_SCALARS:
-                            dv = DEFAULT_SCALARS[k]
-                            st.session_state[k] = (
-                                int(v)   if isinstance(dv, int)   else
-                                float(v) if isinstance(dv, float) else str(v)
-                            )
-
-                    # Load tables → อัปเดต src keys
-                    _lmap = {"df_thickness":"thk_src","df_tendon":"tdn_src","df_load":"ld_src"}
-                    for tbl_key, src_key in _lmap.items():
-                        raw_tbl = loaded.get("tables", {}).get(tbl_key)
-                        if raw_tbl:
-                            ndf = pd.DataFrame(raw_tbl)
-                            for col in ndf.columns:
-                                ndf[col] = pd.to_numeric(ndf[col], errors="coerce")
-                            st.session_state[src_key] = ndf.dropna(how="all")
-
-                    # Increment _tbl_ver → editor key เปลี่ยน → widget ใหม่ → แสดงข้อมูลใหม่
-                    st.session_state["_tbl_ver"] += 1
-                    # ล้าง cached current values จาก session เก่า
-                    for k in ["_cur_thk", "_cur_tdn", "_cur_ld"]:
-                        st.session_state.pop(k, None)
-
-                    st.session_state["_loaded_hash"] = _fhash
-                    st.success("✅  Project loaded successfully!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"❌  Load error: {e}")
+                # ทำลาย Uploader ป้องกัน Loop
+                st.session_state["_uploader_reset"] += 1
+                st.success("✅  Project loaded successfully!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌  Load error: {e}")
     # ── 📐 Materials & Section ───────────────────────────────────────────────
     with st.expander("📐 Materials & Section", expanded=True):
         # ใช้ key=... อย่างเดียว Streamlit จะซิงค์ค่าให้เอง และไม่ค้างตอนโหลด
@@ -218,27 +226,17 @@ st.title("🏗️  PSC Box Girder — Top Flange Transverse Design")
 st.caption("AASHTO LRFD  |  1.0 m transverse strip  |  "
            "Compression (−)  Tension (+)  |  +M = sagging")
 
-# _v เปลี่ยนหลัง load ไฟล์ → key ของ data_editor เปลี่ยน → widget ใหม่ → reinit จาก src ใหม่
-_v = st.session_state["_tbl_ver"]
-
 c1, c2 = st.columns(2)
 with c1:
     st.subheader("📏 Flange Thickness t(x)")
-    df_thk = st.data_editor(
-        st.session_state["thk_src"], num_rows="dynamic", key=f"ed_thk_{_v}")
-    # เก็บ return value ใน _cur_thk (ไม่ใช่ widget key → เขียนได้ปลอดภัย)
-    # ฟังก์ชัน save อ่านจากนี้ → ได้ DataFrame ที่ user เห็นบนหน้าจอจริงๆ เสมอ
-    st.session_state["_cur_thk"] = df_thk
-
+    # Pass src key (stable, never same object as widget key) → no reset → single input works
+    df_thk = st.data_editor(st.session_state["thk_src"], num_rows="dynamic", key="ed_thk")
     st.subheader("🔩 Tendon Profile z(x)  [from top face]")
-    df_tdn = st.data_editor(
-        st.session_state["tdn_src"], num_rows="dynamic", key=f"ed_tdn_{_v}")
-    st.session_state["_cur_tdn"] = df_tdn
+    df_tdn = st.data_editor(st.session_state["tdn_src"], num_rows="dynamic", key="ed_tdn")
 with c2:
     st.subheader("📦 Loads per 1 m strip")
-    df_ld = st.data_editor(
-        st.session_state["ld_src"], num_rows="dynamic", key=f"ed_ld_{_v}")
-    st.session_state["_cur_ld"] = df_ld
+    df_ld  = st.data_editor(st.session_state["ld_src"],  num_rows="dynamic", key="ed_ld")
+# No sync-back: Streamlit forbids writing to widget key; data_editor manages ed_thk etc.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 4.  CALCULATION ENGINE
@@ -462,7 +460,7 @@ try:
             "Load combinations (AASHTO Table 3.4.1-1):",
             "  Strength I  :  1.25·DC + 1.50·DW + 1.75·LL",
             "  Service  I  :  1.00·DC + 1.00·DW + 1.00·LL  (compression check)",
-            "  Service III :  1.00·DC + 1.00·DW + 0.80·LL  (tension check)",
+            "  Service I   :  1.00·DC + 1.00·DW + 1.00·LL  (tension & compression check)",
             "  Transfer    :  Pi (after immediate losses) + M_DC",
             "Strand: Post-tensioned, bonded (fully grouted), low-relaxation",
             "Sign convention: Compression (−)  |  Tension (+)",
@@ -509,9 +507,9 @@ try:
         tbl(["Condition","Expression","Limit (MPa)","Article"],[
             ["Transfer — Compression",         "−0.60·f'ci", f"{R['lim_tr_c']:.3f}","5.9.2.3.1a"],
             ["Transfer — Tension (bonded)",    "+0.62·√f'ci",f"+{R['lim_tr_t']:.4f}","5.9.2.3.1b"],
-            ["Service I — Comp (perm.loads)",  "−0.45·f'c",  f"{R['lim_sv_cp']:.3f}","5.9.2.3.2a"],
-            ["Service I — Comp (total loads)", "−0.60·f'c",  f"{R['lim_sv_ct']:.3f}","5.9.2.3.2a"],
-            ["Service III — Tension (bonded)", "+0.50·√f'c", f"+{R['lim_sv_t']:.4f}","5.9.2.3.2b"],
+            ["Service I — Compression (permanent loads)", "−0.45·f'c",  f"{R['lim_sv_cp']:.3f}","5.9.2.3.2a"],
+            ["Service I — Compression (total loads)",     "−0.60·f'c",  f"{R['lim_sv_ct']:.3f}","5.9.2.3.2a"],
+            ["Service I — Tension (bonded)",              "+0.50·√f'c", f"+{R['lim_sv_t']:.4f}","5.9.2.3.2b"],
         ], cw=[5.5,3.5,2.5,2.5])
         blank()
 
@@ -648,9 +646,6 @@ try:
                 ["Service I",
                  "Ms1 = M_DL + M_SDL + M_LL",
                  f"{mdi:.2f}+{msdi:.2f}+{mli:.2f}", f"{ms1i:.4f}","kNm/m"],
-                ["Service III",
-                 "Ms3 = M_DL + M_SDL + 0.8·M_LL",
-                 f"{mdi:.2f}+{msdi:.2f}+0.8×{mli:.2f}", f"{ms3i:.4f}","kNm/m"],
                 ["Strength I — Moment",
                  "Mu = 1.25·MDL + 1.50·MSDL + 1.75·MLL",
                  f"1.25×{mdi:.2f}+1.50×{msdi:.2f}+1.75×{mli:.2f}",
@@ -697,10 +692,8 @@ try:
             blank()
 
             for (combo_name, M_i, t_s, b_s, note) in [
-                ("Service I  (compression check)",
-                 ms1i, s1t, s1b, "comp"),
-                ("Service III  (tension check)",
-                 ms3i, s3t, s3b, "tens"),
+                ("Service I  (compression & tension check)",
+                 ms1i, s1t, s1b, "both"),
             ]:
                 para(f"── {combo_name}  |  M = {M_i:.4f} kNm/m ──",
                      bold=True, indent=0.3)
@@ -716,14 +709,19 @@ try:
                         f" − {R['Pe']:.4f}×{ei*1000:.4f}×{yci*1000:.4f}/{Igi*1e12:.6f}×10⁻³"
                         f" + {M_i:.4f}×{yci*1000:.4f}/{Igi*1e12:.6f}×10⁻³] × 10⁻³")
                 result(f"σ_bot  =  {b_s:.6f} MPa")
-                if note == "tens":
-                    pf(b_s >= -lsv_t,
-                       f"σ_bot = {b_s:.4f} MPa  ≥  {-lsv_t:.4f} MPa  (tension limit)",
-                       f"σ_bot = {b_s:.4f} MPa  <   {-lsv_t:.4f} MPa  TENSION EXCEEDED")
-                else:
-                    pf(b_s >= lsv_ct,
-                       f"σ_bot = {b_s:.4f} MPa  ≥  {lsv_ct:.3f} MPa  (−0.60·f'c)",
-                       f"σ_bot = {b_s:.4f} MPa  <   {lsv_ct:.3f} MPa  EXCEEDS LIMIT")
+                # Compression check (bottom)
+                pf(b_s >= lsv_ct,
+                   f"σ_bot = {b_s:.4f} MPa  ≥  {lsv_ct:.3f} MPa  (−0.60·f'c)",
+                   f"σ_bot = {b_s:.4f} MPa  <   {lsv_ct:.3f} MPa  EXCEEDS LIMIT")
+                # Tension check — both fibres (Service I)
+                blank()
+                para("  Tension check  (both fibres ≤ +0.50√f'c):", bold=True, indent=0.3)
+                pf(t_s <= lsv_t,
+                   f"σ_top = {t_s:.4f} MPa  ≤  +{lsv_t:.4f} MPa  (tension OK)",
+                   f"σ_top = {t_s:.4f} MPa  >  +{lsv_t:.4f} MPa  TENSION EXCEEDED")
+                pf(b_s <= lsv_t,
+                   f"σ_bot = {b_s:.4f} MPa  ≤  +{lsv_t:.4f} MPa  (tension OK)",
+                   f"σ_bot = {b_s:.4f} MPa  >  +{lsv_t:.4f} MPa  TENSION EXCEEDED")
                 blank()
 
             # 4.x.5  Flexural Strength
@@ -867,8 +865,10 @@ try:
             dcr_v = vui_/pVi_       if pVi_ > 0 else 999
             ok_tr = (R["lim_tr_c"]<=R["tr_top"][i]<=R["lim_tr_t"] and
                      R["lim_tr_c"]<=R["tr_bot"][i]<=R["lim_tr_t"])
-            ok_sv = (R["sv1_top"][i]>=R["lim_sv_ct"] and
-                     R["sv3_bot"][i]>=-R["lim_sv_t"])
+            ok_sv = (R["sv1_top"][i] >= R["lim_sv_ct"] and
+                     R["sv1_bot"][i] >= R["lim_sv_ct"] and
+                     R["sv1_top"][i] <= R["lim_sv_t"]  and
+                     R["sv1_bot"][i] <= R["lim_sv_t"])
             sum_rows.append([
                 f"{R['x'][i]:.2f}",
                 f"{R['tr_top'][i]:.3f}",  f"{R['tr_bot'][i]:.3f}",
@@ -882,19 +882,21 @@ try:
             ])
         tbl(["x(m)",
              "σ_top Tr","σ_bot Tr","Transfer",
-             "σ_top Sv","σ_bot Sv","Service",
+             "σ_top SvcI","σ_bot SvcI","Service I",
              "Mu","φMn","DCR_M","Flexure",
              "Vu","φVn","DCR_V","Shear"],
             sum_rows,
-            cw=[1.2,1.6,1.6,1.4,1.6,1.6,1.4,1.6,1.6,1.4,1.4,1.6,1.6,1.4,1.4])
+            cw=[1.2,1.6,1.6,1.4,1.8,1.8,1.6,1.6,1.6,1.4,1.4,1.6,1.6,1.4,1.4])
         blank()
 
         h1("6.  Conclusion")
         all_pass = all(
             R["lim_tr_c"]<=R["tr_top"][i]<=R["lim_tr_t"] and
             R["lim_tr_c"]<=R["tr_bot"][i]<=R["lim_tr_t"] and
-            R["sv1_top"][i]>=R["lim_sv_ct"] and
-            R["sv3_bot"][i]>=-R["lim_sv_t"] and
+            R["sv1_top"][i] >= R["lim_sv_ct"] and
+            R["sv1_bot"][i] >= R["lim_sv_ct"] and
+            R["sv1_top"][i] <= R["lim_sv_t"]  and
+            R["sv1_bot"][i] <= R["lim_sv_t"]  and
             abs(float(R["mu"][i])) <= max(float(R["phi_Mn_pos"][i]),
                                           abs(float(R["phi_Mn_neg"][i]))) and
             float(R["vu"][i]) <= float(R["phi_Vn"][i])
@@ -1088,28 +1090,28 @@ try:
         st.dataframe(pd.DataFrame(rows_tr), use_container_width=True)
 
     with tabs[2]:
-        st.subheader("Stress Check — Service  (Pe + loads  |  Gross section)")
-        fig3 = make_subplots(1, 2,
-                             subplot_titles=("Service I — Compression", "Service III — Tension"))
-        for col_n, (tops, bots) in enumerate(
-            [(R["sv1_top"], R["sv1_bot"]), (R["sv3_top"], R["sv3_bot"])], 1
-        ):
-            fig3.add_trace(go.Scatter(x=R["x"], y=tops, name="Top", line_color="red"),  1, col_n)
-            fig3.add_trace(go.Scatter(x=R["x"], y=bots, name="Bot", line_color="blue"), 1, col_n)
-            fig3.add_hline(y=R["lim_sv_ct"], row=1, col=col_n,
-                           line_dash="dash", line_color="orange")
-            fig3.add_hline(y=-R["lim_sv_t"], row=1, col=col_n,
-                           line_dash="dot",  line_color="green")
-        fig3.update_layout(height=380)
+        st.subheader("Stress Check — Service I  (Pe + Ms1  |  Gross section)")
+        fig3 = go.Figure([
+            go.Scatter(x=R["x"], y=R["sv1_top"], name="Top", line_color="red"),
+            go.Scatter(x=R["x"], y=R["sv1_bot"], name="Bottom", line_color="blue"),
+        ])
+        fig3.add_hline(y=R["lim_sv_ct"], line_dash="dash", line_color="orange",
+                       annotation_text=f"−0.60f'c = {R['lim_sv_ct']:.2f} MPa")
+        fig3.add_hline(y=R["lim_sv_cp"], line_dash="dot",  line_color="orange",
+                       annotation_text=f"−0.45f'c = {R['lim_sv_cp']:.2f} MPa")
+        fig3.add_hline(y=R["lim_sv_t"],  line_dash="dash", line_color="green",
+                       annotation_text=f"+0.50√f'c = +{R['lim_sv_t']:.3f} MPa")
+        fig3.update_layout(height=380, xaxis_title="x (m)", yaxis_title="Stress (MPa)")
         st.plotly_chart(fig3, use_container_width=True)
-        rows_sv = [{"x (m)": f"{R['x'][i]:.2f}",
-                    "σ_top SvcI":   f"{R['sv1_top'][i]:.4f}",
-                    "σ_bot SvcI":   f"{R['sv1_bot'][i]:.4f}",
-                    "σ_top SvcIII": f"{R['sv3_top'][i]:.4f}",
-                    "σ_bot SvcIII": f"{R['sv3_bot'][i]:.4f}",
-                    "Status": "✅" if (R["sv1_top"][i]>=R["lim_sv_ct"] and
-                                       R["sv1_bot"][i]>=R["lim_sv_ct"] and
-                                       R["sv3_bot"][i]>=-R["lim_sv_t"]) else "❌"}
+        rows_sv = [{"x (m)":        f"{R['x'][i]:.2f}",
+                    "σ_top (MPa)":  f"{R['sv1_top'][i]:.4f}",
+                    "σ_bot (MPa)":  f"{R['sv1_bot'][i]:.4f}",
+                    "Comp. Limit":  f"{R['lim_sv_ct']:.2f}",
+                    "Tens. Limit":  f"+{R['lim_sv_t']:.3f}",
+                    "Status": "✅" if (R["sv1_top"][i] >= R["lim_sv_ct"] and
+                                       R["sv1_bot"][i] >= R["lim_sv_ct"] and
+                                       R["sv1_top"][i] <= R["lim_sv_t"]  and
+                                       R["sv1_bot"][i] <= R["lim_sv_t"]) else "❌"}
                    for i in sta_idx]
         st.dataframe(pd.DataFrame(rows_sv), use_container_width=True)
 
@@ -1174,8 +1176,10 @@ try:
             pVi_= float(R["phi_Vn"][i])
             ok_tr = (R["lim_tr_c"]<=R["tr_top"][i]<=R["lim_tr_t"] and
                      R["lim_tr_c"]<=R["tr_bot"][i]<=R["lim_tr_t"])
-            ok_sv = (R["sv1_top"][i]>=R["lim_sv_ct"] and
-                     R["sv3_bot"][i]>=-R["lim_sv_t"])
+            ok_sv = (R["sv1_top"][i] >= R["lim_sv_ct"] and
+                     R["sv1_bot"][i] >= R["lim_sv_ct"] and
+                     R["sv1_top"][i] <= R["lim_sv_t"]  and
+                     R["sv1_bot"][i] <= R["lim_sv_t"])
             dcr_m = abs(mui_)/cap   if cap >0 else 999
             dcr_v = vui_/pVi_       if pVi_>0 else 999
             rows_sum.append({
