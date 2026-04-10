@@ -262,183 +262,197 @@ def calc_losses(dft, dfp, fc, fci, fpu, fpi_ratio, aps_strand,
                 num_tendon, n_strands, duct_dia_mm,
                 t0, RH, anch_slip_mm, width):
     """
-    Compute all prestress losses per AASHTO LRFD 5.9.3.
-    Returns dict with individual losses, totals, and Pi/Pe arrays.
-    Geometry evaluated at midspan (x = width/2) as representative section.
+    Prestress loss calculation per AASHTO LRFD 5.9.3.
+    Immediate: Friction (5.9.3.2.1) + Anchorage Set (5.9.3.2.2) + Elastic Shortening (5.9.3.2.3)
+    Long-term: Shrinkage + Creep (5.9.3.4) + Relaxation (5.9.3.4.3)
+    All stress in MPa. Geometry at midspan (representative section).
     """
     # ── Constants ──────────────────────────────────────────────────────────
-    Ep     = 197_000.0          # MPa  (AASHTO 5.4.4.2)
-    mu     = 0.20               # friction coefficient  (AASHTO Table 5.9.3.2.1b-1)
-    K_wob  = 0.0066             # wobble coefficient rad/m
-    KL     = 45.0               # relaxation factor, low-relax
-    b      = 1.0                # 1 m strip
+    Ep    = 197_000.0    # Modulus of elasticity of prestress steel (MPa) [AASHTO 5.4.4.2]
+    mu    = 0.20         # Friction coefficient (-) for grouted PT duct [AASHTO Table 5.9.3.2.1b-1]
+    K_wob = 0.0066       # Wobble coefficient (rad/m) for grouted duct
+    KL    = 45.0         # Relaxation factor (-) for low-relaxation strand [AASHTO 5.9.3.4.3c]
+    b     = 1.0          # Strip width (m)
+    wc    = 2400.0       # Unit weight of concrete (kg/m³) normal weight
 
-    # ── Section at midspan ─────────────────────────────────────────────────
-    x_mid = width / 2.0
+    # ── Section properties at midspan ─────────────────────────────────────
+    x_mid  = width / 2.0
     t_mid  = float(np.interp(x_mid, dft["x (m)"], dft["t (m)"]))
     z_mid  = float(np.interp(x_mid, dfp["x (m)"], dfp["z_top (m)"]))
     yc_mid = t_mid / 2.0
-    e_mid  = yc_mid - z_mid          # eccentricity (+ = tendon above CG)
+    e_mid  = yc_mid - z_mid    # Eccentricity (+: tendon above centroid) (m)
 
-    Ag_mid = b * t_mid
-    Ig_mid = b * t_mid**3 / 12.0
+    Ag_mid = b * t_mid                       # Gross cross-sectional area (m²/m)
+    Ig_mid = b * t_mid**3 / 12.0             # Gross moment of inertia (m⁴/m)
     A_duct = math.pi / 4.0 * (duct_dia_mm / 1000.0)**2
     n_duct = int(num_tendon)
     y_duct = z_mid - yc_mid
-    An_mid = Ag_mid - n_duct * A_duct
-    In_mid = Ig_mid - n_duct * A_duct * y_duct**2
+    An_mid = Ag_mid - n_duct * A_duct        # Net area after duct deduction (m²/m)
+    In_mid = Ig_mid - n_duct * A_duct * y_duct**2  # Net inertia (m⁴/m)
+    VS     = (b * t_mid) / (2.0 * (b + t_mid))     # Volume-to-Surface ratio (m)
+    VS_mm  = VS * 1000.0                             # V/S in mm
 
-    aps_m2  = aps_strand * 1e-6         # m² per strand
+    aps_m2  = aps_strand * 1e-6              # Area per strand (m²)
     n_total = int(num_tendon * n_strands)
-    Aps     = n_total * aps_m2           # m²/m strip
+    Aps     = n_total * aps_m2               # Total tendon area per 1m strip (m²/m)
 
-    # ── Modulus of elasticity (AASHTO 5.4.2.4) ─────────────────────────────
-    wc   = 2400.0                        # kg/m³ normal weight concrete
-    Ec   = 0.043 * (wc**1.5) * math.sqrt(fc)    # MPa
-    Eci  = 0.043 * (wc**1.5) * math.sqrt(fci)   # MPa at transfer
+    # ── Modulus of elasticity of concrete (AASHTO 5.4.2.4) ────────────────
+    # Ec = 0.043 × wc^1.5 × √f'c  (MPa, wc in kg/m³)
+    Ec  = 0.043 * (wc**1.5) * math.sqrt(fc)    # At service (MPa)
+    Eci = 0.043 * (wc**1.5) * math.sqrt(fci)   # At transfer (MPa)
 
-    # ── Angular change α (total angle change along tendon) ─────────────────
-    # Numerical integration of |dz/dx| along tendon profile
+    # ── Tendon geometry ────────────────────────────────────────────────────
+    # Angular change α = sum of absolute curvature changes along tendon (rad)
     xs = dft["x (m)"].values.astype(float)
     zs = np.interp(xs, dfp["x (m)"].values, dfp["z_top (m)"].values)
-    # angle = sum of |slope changes| (conservative for straight segments)
-    dz = np.diff(zs);  dx = np.diff(xs)
-    dx_safe = np.where(np.abs(dx) < 1e-9, 1e-9, dx)
-    slopes  = dz / dx_safe
-    alpha   = float(np.sum(np.abs(np.diff(np.append([0], np.arctan(slopes))))))
-    alpha   = max(alpha, 0.001)          # at least 1 mrad
-
-    # Tendon length (along profile, approx)
-    L_ten = float(np.sum(np.sqrt(dx**2 + dz**2)))
+    dz = np.diff(zs); dx = np.diff(xs)
+    dx_s = np.where(np.abs(dx) < 1e-9, 1e-9, dx)
+    alpha = float(np.sum(np.abs(np.diff(np.append([0], np.arctan(dz / dx_s))))))
+    alpha = max(alpha, 0.001)              # Minimum curvature 1 mrad
+    L_ten = float(np.sum(np.sqrt(dx**2 + dz**2)))   # Tendon length along profile (m)
     if L_ten < 0.5: L_ten = float(xs[-1] - xs[0])
 
     # ── Jacking parameters ─────────────────────────────────────────────────
-    fpj  = fpu * fpi_ratio               # MPa jacking stress
-    Pj   = Aps * fpj * 1e3              # kN/m jacking force per strip
+    fpj = fpu * fpi_ratio          # Jacking stress (MPa) = 0.75 fpu default
+    Pj  = Aps * fpj * 1e3          # Jacking force per 1m strip (kN/m)
 
     # ══════════════════════════════════════════════════════════════════════
-    # IMMEDIATE LOSSES
+    # SECTION A — IMMEDIATE LOSSES
     # ══════════════════════════════════════════════════════════════════════
 
-    # 1. Friction Loss  ΔfpF  (AASHTO 5.9.3.2.1)
-    # One-end jacking → worst at far end (x = L)
-    exponent  = mu * alpha + K_wob * L_ten
-    delta_fpF = fpj * (1.0 - math.exp(-exponent))     # MPa
-    # Average loss over length (use midspan as representative)
-    exponent_mid = mu * (alpha / 2.0) + K_wob * (L_ten / 2.0)
-    delta_fpF_avg = fpj * (1.0 - math.exp(-exponent_mid))
+    # ── A1. Friction Loss  ΔfpF  (AASHTO 5.9.3.2.1) ───────────────────────
+    # ΔfpF = fpj × (1 − e^(−μα − Kx))
+    # Evaluate at full length (dead end) and at midspan (representative)
+    exp_full = mu * alpha + K_wob * L_ten
+    delta_fpF_full = fpj * (1.0 - math.exp(-exp_full))  # loss at dead end
+    exp_mid  = mu * (alpha / 2.0) + K_wob * (L_ten / 2.0)
+    delta_fpF = fpj * (1.0 - math.exp(-exp_mid))         # loss at midspan (used)
 
-    # 2. Anchorage Set Loss  ΔfpA  (AASHTO 5.9.3.2.2)
-    # Length influenced by anchor set:
-    Lpa     = math.sqrt((anch_slip_mm / 1000.0) * Ep / (mu * fpj / L_ten + K_wob) / 1e3)
-    Lpa     = min(Lpa, L_ten)
-    delta_fpA = (anch_slip_mm / 1000.0) * Ep / Lpa    # MPa
-    delta_fpA = min(delta_fpA, fpj)                    # cap at jacking stress
+    # ── A2. Anchorage Set Loss  ΔfpA  (AASHTO 5.9.3.2.2) ──────────────────
+    # Friction loss slope (rate of friction loss per unit length) [MPa/m]:
+    # w = fpj × (μ × α/L + K)   [MPa/m]
+    # [FIX] correct slope uses angular change rate (α/L), not just fpj/L
+    friction_slope = fpj * (mu * alpha / L_ten + K_wob)   # MPa/m
 
-    # Stress after friction + anchor at midspan
-    fpt_mid = fpj - delta_fpF_avg - (delta_fpA if Lpa > L_ten / 2 else 0.0)
-    fpt_mid = max(fpt_mid, 0.1 * fpj)
+    # Anchor set influence length:
+    # Lpa = √(Δ_m × Ep_MPa / friction_slope_MPa_per_m)   → result in metres
+    # Unit check: √(m × MPa / (MPa/m)) = √(m²) = m  ✓
+    Lpa = math.sqrt((anch_slip_mm / 1000.0) * Ep / friction_slope)   # m  [FIX: no /1e3]
+    Lpa = min(Lpa, L_ten)
 
-    # 3. Elastic Shortening  ΔfpES  (AASHTO 5.9.3.2.3)
-    # fcgp = stress in concrete at CG of PT at transfer (Pi applied)
-    # Iterative: Pi = Aps*(fpt_mid), but simplified single-step
-    Pi_est   = Aps * fpt_mid * 1e3                    # kN/m
-    fcgp     = (Pi_est / An_mid + Pi_est * e_mid**2 / In_mid) / 1000.0  # MPa
-    delta_fpES = (Ep / Eci) * fcgp                     # MPa
+    # Anchorage set stress loss at jacking end:
+    # ΔfpA = Δ_m × Ep_MPa / Lpa_m  [MPa]
+    delta_fpA = (anch_slip_mm / 1000.0) * Ep / Lpa
+    delta_fpA = min(delta_fpA, 0.20 * fpj)   # sanity cap 20% of fpj
+
+    # Stress in tendon at midspan after friction + anchor losses
+    # (anchor set affects tendon only within Lpa from jacking end)
+    fpt_mid = fpj - delta_fpF - (delta_fpA if Lpa > L_ten / 2.0 else 0.0)
+    fpt_mid = max(fpt_mid, 0.5 * fpj)
+
+    # ── A3. Elastic Shortening  ΔfpES  (AASHTO 5.9.3.2.3) ─────────────────
+    # fcgp = concrete stress at tendon CG level at transfer
+    # fcgp = Pi/An + Pi·e²/In   (compression positive for this term)
+    Pi_est = Aps * fpt_mid * 1e3           # Estimated Pi (kN/m)
+    fcgp   = (Pi_est/An_mid + Pi_est*e_mid**2/In_mid) / 1000.0  # MPa
+    # ΔfpES = (Ep/Eci) × fcgp
+    delta_fpES = (Ep / Eci) * fcgp
     delta_fpES = max(0.0, delta_fpES)
 
-    # ── Immediate loss summary ──────────────────────────────────────────────
-    delta_imm_total  = delta_fpF_avg + delta_fpA + delta_fpES  # MPa
-    imm_loss_pct     = delta_imm_total / fpj * 100.0
+    # ── Immediate loss totals ──────────────────────────────────────────────
+    delta_imm   = delta_fpF + delta_fpA + delta_fpES
+    imm_loss_pct = delta_imm / fpj * 100.0
 
-    # Effective stress after immediate losses (at midspan)
-    fpi_eff  = fpj - delta_imm_total                  # MPa
-    Pi_final = Aps * fpi_eff * 1e3                   # kN/m per strip
+    fpi_eff  = max(fpj - delta_imm, 0.5 * fpj)   # Effective stress after transfer
+    Pi_final = Aps * fpi_eff * 1e3                # Pi per 1m strip (kN/m)
 
     # ══════════════════════════════════════════════════════════════════════
-    # LONG-TERM LOSSES  (AASHTO 5.9.3.3 — Approximate Method)
+    # SECTION B — LONG-TERM LOSSES  (AASHTO 5.9.3.4)
     # ══════════════════════════════════════════════════════════════════════
 
-    # Volume-to-Surface ratio (rectangular 1m strip, closed duct)
-    VS = (b * t_mid) / (2.0 * (b + t_mid))    # m
+    # ── Correction factors ─────────────────────────────────────────────────
+    fci_ksi = fci / 6.895    # f'ci converted to ksi for AASHTO factor formulas
 
-    # Size factor  kvs  (AASHTO 5.4.2.3.2)
-    kvs = max(1.45 - 0.0052 * (VS * 1000.0), 1.0)   # VS in mm → use mm
-    VS_mm = VS * 1000.0
-    kvs   = max(1.45 - 0.0052 * VS_mm, 1.0)
+    # kvs: Size factor for V/S ratio (AASHTO 5.4.2.3.2)
+    kvs = max(1.45 - 0.0052 * VS_mm, 1.0)    # V/S in mm
 
-    # Humidity factors
-    khs   = 2.00 - 0.014 * RH          # shrinkage humidity factor
-    khc   = 1.56 - 0.008 * RH          # creep humidity factor
-    khs   = max(khs, 0.0)
-    khc   = max(khc, 0.0)
+    # khs: Humidity factor for shrinkage (AASHTO 5.4.2.3.3)
+    khs = max(2.00 - 0.014 * RH, 0.0)
 
-    # Concrete strength factor
-    kf    = 5.0 / (1.0 + fci)
+    # khc: Humidity factor for creep (AASHTO 5.4.2.3.2)
+    khc = max(1.56 - 0.008 * RH, 0.0)
 
-    # Time factors (for t→∞, ktd = 1)
-    ktd_inf = 1.0
+    # kf: Concrete strength factor — uses f'ci in ksi (AASHTO 5.4.2.3.2)
+    # [FIX] must use ksi, not MPa
+    kf = 5.0 / (1.0 + fci_ksi)
 
-    # Creep coefficient  Ψb  (AASHTO 5.4.2.3.2)
-    ti_safe = max(t0, 1.0)
-    psi_b   = 1.9 * kvs * khc * kf * ktd_inf * (ti_safe ** -0.118)
+    # ktd: Time development factor (t→∞ for final losses: ktd = 1)
+    ktd = 1.0
 
-    # Shrinkage strain  εsh  (AASHTO 5.4.2.3.3)
-    eps_sh  = kvs * khs * kf * ktd_inf * 0.48e-3
+    # ── B1. Shrinkage strain  εbdf  (AASHTO 5.4.2.3.3) ────────────────────
+    # εbdf = kvs × khs × kf × ktd × 0.48 × 10⁻³
+    eps_bdf = kvs * khs * kf * ktd * 0.48e-3   # Shrinkage strain (dimensionless)
 
-    # 4. Shrinkage Loss  ΔfpSH  (AASHTO 5.9.3.3-1)
-    gamma_h  = 1.7 - 0.01 * RH
-    gamma_st = 5.0 / (1.0 + fci)
-    gamma_h  = max(gamma_h, 0.0)
+    # Shrinkage loss (AASHTO 5.9.3.4.2a-1):
+    # ΔfpSH = εbdf × Ep
+    delta_fpSH = eps_bdf * Ep                   # MPa
 
-    # Approximate method (AASHTO 5.9.3.3):
-    # ΔfpLT = 10 * (fpi*Aps/Ag)*γh*γst  +  83*γh*γst  +  ΔfpR
-    fcgp_bar = (Pi_final / An_mid + Pi_final * e_mid**2 / In_mid) / 1000.0
-    delta_fpSH_cr = 10.0 * (fpi_eff * Aps / (Ag_mid * 1e3)) * gamma_h * gamma_st
-    delta_fpSH_sh = 83.0 * gamma_h * gamma_st
+    # ── B2. Creep coefficient  ψb  (AASHTO 5.4.2.3.2) ─────────────────────
+    ti_safe = max(float(t0), 1.0)
+    # ψb(t,ti) = 1.9 × kvs × khc × kf × ktd × ti^(−0.118)
+    psi_b = 1.9 * kvs * khc * kf * ktd * (ti_safe ** -0.118)
 
-    # 5. Relaxation Loss  ΔfpR2  (AASHTO 5.9.3.4.3 low-relax)
-    delta_fpR = 0.3 * (20.0 - 0.4 * delta_fpES - 0.2 * (delta_fpSH_cr + delta_fpSH_sh))
-    delta_fpR = max(delta_fpR, 0.0)
+    # Concrete stress at tendon CG at transfer  fcgp  (MPa)
+    fcgp_lt = (Pi_final/An_mid + Pi_final*e_mid**2/In_mid) / 1000.0  # MPa compression
 
-    # Total long-term
-    delta_lt_total = delta_fpSH_cr + delta_fpSH_sh + delta_fpR
-    lt_loss_pct    = delta_lt_total / fpi_eff * 100.0 if fpi_eff > 0 else 0.0
+    # Creep loss (AASHTO 5.9.3.4.2b-1):
+    # ΔfpCR = (Ep/Ec) × fcgp × ψb
+    delta_fpCR = max((Ep / Ec) * fcgp_lt * psi_b, 0.0)   # MPa
 
-    # ── Final effective prestress ───────────────────────────────────────────
-    fpe_val   = fpi_eff - delta_lt_total               # MPa
-    fpe_val   = max(fpe_val, 0.5 * fpj)
-    Pe_final  = Aps * fpe_val * 1e3                   # kN/m
+    # ── B3. Relaxation after transfer  ΔfpR2  (AASHTO 5.9.3.4.3c) ─────────
+    # For low-relaxation strand:
+    # ΔfpR2 = (fpt/KL) × (fpt/fpy − 0.55)  ≥ 0
+    fpy = fpu * fpi_ratio / fpi_ratio * 0.9   # yield = 0.9 fpu for low-relax
+    # fpt = stress after subtracting portion of long-term losses
+    fpt_r = fpi_eff - 0.3 * (delta_fpSH + delta_fpCR)
+    fpt_r = max(fpt_r, 0.5 * fpu)
+    delta_fpR = max((fpt_r / KL) * (fpt_r / fpy - 0.55), 0.0)   # MPa
 
-    # Ratios for backward compatibility
-    eff_ratio_calc = Pe_final / Pj if Pj > 0 else 0.75
+    # ── Long-term totals ───────────────────────────────────────────────────
+    delta_lt    = delta_fpSH + delta_fpCR + delta_fpR
+    lt_loss_pct = delta_lt / fpj * 100.0
+
+    # ── Final effective prestress ──────────────────────────────────────────
+    fpe_val  = max(fpi_eff - delta_lt, 0.45 * fpj)
+    Pe_final = Aps * fpe_val * 1e3    # Pe per 1m strip (kN/m)
 
     return dict(
         # Material
         Ec=Ec, Eci=Eci, Ep=Ep,
         # Section
         t_mid=t_mid, z_mid=z_mid, e_mid=e_mid,
-        Ag_mid=Ag_mid, Ig_mid=Ig_mid, An_mid=An_mid, In_mid=In_mid, VS=VS, VS_mm=VS_mm,
+        Ag_mid=Ag_mid, Ig_mid=Ig_mid, An_mid=An_mid, In_mid=In_mid,
+        VS=VS, VS_mm=VS_mm,
         Aps=Aps, n_total=n_total,
         # Tendon geometry
-        alpha=alpha, L_ten=L_ten, Lpa=Lpa,
+        alpha=alpha, L_ten=L_ten, Lpa=Lpa, friction_slope=friction_slope,
         # Jacking
         fpj=fpj, Pj=Pj,
-        # Immediate
-        delta_fpF=delta_fpF_avg, delta_fpA=delta_fpA, delta_fpES=delta_fpES,
-        delta_imm=delta_imm_total, imm_loss_pct=imm_loss_pct,
-        fcgp=fcgp, fpt_mid=fpt_mid,
-        Pi=Pi_final,
+        # Immediate losses
+        delta_fpF=delta_fpF, delta_fpF_full=delta_fpF_full,
+        delta_fpA=delta_fpA, delta_fpES=delta_fpES,
+        delta_imm=delta_imm, imm_loss_pct=imm_loss_pct,
+        fcgp=fcgp, fpt_mid=fpt_mid, Pi=Pi_final,
         # Long-term factors
-        kvs=kvs, khs=khs, khc=khc, kf=kf, psi_b=psi_b, eps_sh=eps_sh,
-        gamma_h=gamma_h, gamma_st=gamma_st,
-        # Long-term
-        delta_fpSH_cr=delta_fpSH_cr, delta_fpSH_sh=delta_fpSH_sh, delta_fpR=delta_fpR,
-        delta_lt=delta_lt_total, lt_loss_pct=lt_loss_pct,
-        # Final
+        fci_ksi=fci_ksi, kvs=kvs, khs=khs, khc=khc, kf=kf, ktd=ktd,
+        psi_b=psi_b, eps_bdf=eps_bdf,
+        # Long-term losses
+        fcgp_lt=fcgp_lt, delta_fpSH=delta_fpSH,
+        delta_fpCR=delta_fpCR, delta_fpR=delta_fpR,
+        delta_lt=delta_lt, lt_loss_pct=lt_loss_pct,
         fpi_eff=fpi_eff, fpe=fpe_val, Pe=Pe_final,
-        eff_ratio=eff_ratio_calc,
-        total_loss_pct=(delta_imm_total + delta_lt_total) / fpj * 100.0,
+        eff_ratio=Pe_final / Pj if Pj > 0 else 0.75,
+        total_loss_pct=(delta_imm + delta_lt) / fpj * 100.0,
     )
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -871,24 +885,24 @@ try:
         formula("ΔfpCR  =  10.0 × (fpi·Aps/Ag) × γh × γst")
         Ag_v = float(_L["Ag_mid"]); fpi_v = float(_L["fpi_eff"]); Aps_v = float(_L["Aps"])
         subst( f"       =  10.0 × ({fpi_v:.2f}×{Aps_v*1e6:.2f}mm²/{Ag_v*1e6:.2f}mm²) × {_L['gamma_h']:.4f} × {_L['gamma_st']:.4f}")
-        result(f"ΔfpCR  =  {_L['delta_fpSH_cr']:.4f} MPa")
+        result(f"ΔfpCR  =  {_L['delta_fpCR']:.4f} MPa")
         blank()
 
         h3("3.5.3  Shrinkage Loss  ΔfpSH  (AASHTO 5.9.3.3-1)")
         formula("ΔfpSH  =  83 × γh × γst")
         subst( f"       =  83 × {_L['gamma_h']:.4f} × {_L['gamma_st']:.4f}")
-        result(f"ΔfpSH  =  {_L['delta_fpSH_sh']:.4f} MPa")
+        result(f"ΔfpSH  =  {_L['delta_fpSH']:.4f} MPa")
         blank()
 
         h3("3.5.4  Relaxation Loss  ΔfpR  (AASHTO 5.9.3.4.3, low-relax)")
         formula("ΔfpR   =  0.3 × [20.0 − 0.4·ΔfpES − 0.2·(ΔfpCR + ΔfpSH)]")
-        subst( f"       =  0.3 × [20.0 − 0.4×{_L['delta_fpES']:.4f} − 0.2×({_L['delta_fpSH_cr']:.4f}+{_L['delta_fpSH_sh']:.4f})]")
+        subst( f"       =  0.3 × [20.0 − 0.4×{_L['delta_fpES']:.4f} − 0.2×({_L['delta_fpCR']:.4f}+{_L['delta_fpSH']:.4f})]")
         result(f"ΔfpR   =  {_L['delta_fpR']:.4f} MPa")
         blank()
 
         h3("3.5.5  Total Long-Term Loss & Effective Prestress")
         formula("ΔfLT   =  ΔfpCR + ΔfpSH + ΔfpR")
-        subst( f"       =  {_L['delta_fpSH_cr']:.4f} + {_L['delta_fpSH_sh']:.4f} + {_L['delta_fpR']:.4f}")
+        subst( f"       =  {_L['delta_fpCR']:.4f} + {_L['delta_fpSH']:.4f} + {_L['delta_fpR']:.4f}")
         result(f"ΔfLT   =  {_L['delta_lt']:.4f} MPa  ({_L['lt_loss_pct']:.2f}% of fpi)")
         blank()
         formula("Δftotal  =  Δfi + ΔfLT")
@@ -1451,22 +1465,38 @@ try:
 
         st.markdown("---")
         st.markdown("#### Immediate Losses")
-        _d = {"Loss Component": ["1. Friction  ΔfpF",
-                                  "2. Anchorage Set  ΔfpA",
-                                  "3. Elastic Shortening  ΔfpES",
-                                  "**Total Immediate  Δfi**"],
-              "Formula / Ref": ["fpj(1−e^(−μα−Kx))  [5.9.3.2.1]",
-                                 "Δ·Ep/Lpa  [5.9.3.2.2]",
-                                 "(Ep/Eci)·fcgp  [5.9.3.2.3]",
-                                 "ΔfpF + ΔfpA + ΔfpES"],
-              "Loss (MPa)":    [f"{_L['delta_fpF']:.2f}",
-                                 f"{_L['delta_fpA']:.2f}",
-                                 f"{_L['delta_fpES']:.2f}",
-                                 f"**{_L['delta_imm']:.2f}**"],
-              "Loss (%)":      [f"{_L['delta_fpF']/_fpj*100:.2f}",
-                                 f"{_L['delta_fpA']/_fpj*100:.2f}",
-                                 f"{_L['delta_fpES']/_fpj*100:.2f}",
-                                 f"**{_L['imm_loss_pct']:.2f}**"],}
+        _d = {
+            "Loss Component": [
+                "1. Friction  ΔfpF  (at midspan)",
+                "2. Anchorage Set  ΔfpA  (at jacking end)",
+                "3. Elastic Shortening  ΔfpES",
+                "Total Immediate  Δfi",
+            ],
+            "Formula  [AASHTO Ref.]": [
+                "fpj(1−e^(−μα−Kx))  [5.9.3.2.1]",
+                "Δ·Ep/Lpa  [5.9.3.2.2]",
+                "(Ep/Eci)·fcgp  [5.9.3.2.3]",
+                "ΔfpF + ΔfpA + ΔfpES",
+            ],
+            "Key Params": [
+                f"μ={0.20}, K={0.0066}, α={_L['alpha']:.4f}rad",
+                f"Δ={st.session_state.get('anch_slip_mm',6):.0f}mm, Lpa={_L['Lpa']:.2f}m (anchor influence length)",
+                f"fcgp={_L['fcgp']:.3f}MPa (concrete stress at tendon CG at transfer), Eci={_L['Eci']:.0f}MPa",
+                "",
+            ],
+            "Loss (MPa)": [
+                f"{_L['delta_fpF']:.2f}",
+                f"{_L['delta_fpA']:.2f}",
+                f"{_L['delta_fpES']:.2f}",
+                f"{_L['delta_imm']:.2f}",
+            ],
+            "% of fpj": [
+                f"{_L['delta_fpF']/_fpj*100:.2f}",
+                f"{_L['delta_fpA']/_fpj*100:.2f}",
+                f"{_L['delta_fpES']/_fpj*100:.2f}",
+                f"{_L['imm_loss_pct']:.2f}",
+            ],
+        }
         st.dataframe(pd.DataFrame(_d), use_container_width=True)
 
         col_x, col_y = st.columns(2)
@@ -1475,26 +1505,42 @@ try:
 
         st.markdown("---")
         st.markdown("#### Long-Term Losses  (Approximate Method)")
-        _d2 = {"Loss Component": ["4. Creep  ΔfpCR",
-                                   "5. Shrinkage  ΔfpSH",
-                                   "6. Relaxation  ΔfpR",
-                                   "**Total Long-term  ΔfLT**",
-                                   "**TOTAL LOSS  Δftotal**"],
-               "Formula / Ref": ["10(fpi·Aps/Ag)·γh·γst  [5.9.3.3]",
-                                   "83·γh·γst  [5.9.3.3]",
-                                   "0.3(20−0.4ΔfpES−0.2(CR+SH))  [5.9.3.4.3]",
-                                   "ΔfpCR + ΔfpSH + ΔfpR",
-                                   "Δfi + ΔfLT"],
-               "Loss (MPa)":    [f"{_L['delta_fpSH_cr']:.2f}",
-                                   f"{_L['delta_fpSH_sh']:.2f}",
-                                   f"{_L['delta_fpR']:.2f}",
-                                   f"**{_L['delta_lt']:.2f}**",
-                                   f"**{_L['delta_imm']+_L['delta_lt']:.2f}**"],
-               "Loss (%)":      [f"{_L['delta_fpSH_cr']/_fpj*100:.2f}",
-                                   f"{_L['delta_fpSH_sh']/_fpj*100:.2f}",
-                                   f"{_L['delta_fpR']/_fpj*100:.2f}",
-                                   f"**{_L['lt_loss_pct']:.2f}**",
-                                   f"**{_L['total_loss_pct']:.2f}**"],}
+        _d2 = {
+            "Loss Component": [
+                "4. Shrinkage  ΔfpSH",
+                "5. Creep  ΔfpCR",
+                "6. Relaxation  ΔfpR2",
+                "Total Long-term  ΔfLT",
+                "TOTAL LOSS  Δftotal",
+            ],
+            "Formula  [AASHTO Ref.]": [
+                "εbdf × Ep  [5.9.3.4.2a]",
+                "(Ep/Ec) × fcgp × ψb  [5.9.3.4.2b]",
+                "(fpt/KL)(fpt/fpy − 0.55)  [5.9.3.4.3c]",
+                "ΔfpSH + ΔfpCR + ΔfpR",
+                "Δfi + ΔfLT",
+            ],
+            "Key Params": [
+                f"εbdf={_L['eps_bdf']:.5f} (shrinkage strain), kvs={_L['kvs']:.3f} (V/S factor), khs={_L['khs']:.3f} (humidity factor for shrinkage), kf={_L['kf']:.3f} (strength factor)",
+                f"ψb={_L['psi_b']:.3f} (creep coefficient), fcgp={_L['fcgp_lt']:.3f}MPa (concrete stress at tendon CG), khc={_L['khc']:.3f} (humidity factor for creep)",
+                f"KL={45} (relaxation factor low-relax), fpt/fpy={_L['fpi_eff']/(_fpj*0.9):.3f}",
+                "", "",
+            ],
+            "Loss (MPa)": [
+                f"{_L['delta_fpSH']:.2f}",
+                f"{_L['delta_fpCR']:.2f}",
+                f"{_L['delta_fpR']:.2f}",
+                f"{_L['delta_lt']:.2f}",
+                f"{_L['delta_imm']+_L['delta_lt']:.2f}",
+            ],
+            "% of fpj": [
+                f"{_L['delta_fpSH']/_fpj*100:.2f}",
+                f"{_L['delta_fpCR']/_fpj*100:.2f}",
+                f"{_L['delta_fpR']/_fpj*100:.2f}",
+                f"{_L['lt_loss_pct']:.2f}",
+                f"{_L['total_loss_pct']:.2f}",
+            ],
+        }
         st.dataframe(pd.DataFrame(_d2), use_container_width=True)
 
         col_p, col_q, col_r = st.columns(3)
@@ -1507,17 +1553,44 @@ try:
         st.markdown("---")
         st.markdown("#### Key Factors Used")
         _factors = {
-            "Parameter": ["Ec (service)", "Eci (transfer)", "Ep", "μ (friction)",
-                           "K (wobble)", "α (angular change)", "Tendon length",
-                           "Lpa (anchor influence)", "V/S ratio",
-                           "kvs", "khs", "khc", "kf", "γh", "γst", "ψb (creep coeff)"],
-            "Value": [f"{_L['Ec']:.0f} MPa", f"{_L['Eci']:.0f} MPa",
-                      "197,000 MPa", "0.20", "0.0066 rad/m",
-                      f"{_L['alpha']:.4f} rad", f"{_L['L_ten']:.3f} m",
-                      f"{_L['Lpa']:.3f} m", f"{_L['VS_mm']:.1f} mm",
-                      f"{_L['kvs']:.4f}", f"{_L['khs']:.4f}", f"{_L['khc']:.4f}",
-                      f"{_L['kf']:.4f}", f"{_L['gamma_h']:.4f}", f"{_L['gamma_st']:.4f}",
-                      f"{_L['psi_b']:.4f}"],
+            "Parameter (description)": [
+                "Ec  (modulus of elasticity of concrete at service)",
+                "Eci  (modulus of elasticity of concrete at transfer)",
+                "Ep  (modulus of elasticity of prestress steel)",
+                "μ  (friction coefficient, grouted duct)",
+                "K  (wobble coefficient, grouted duct)",
+                "α  (total angular change of tendon)",
+                "L  (tendon length along profile)",
+                "friction slope  (rate of friction loss per unit length)",
+                "Lpa  (anchor set influence length)",
+                "Δ  (anchorage slip)",
+                "V/S  (volume-to-surface ratio)",
+                "kvs  (V/S size factor for shrinkage/creep)",
+                "khs  (humidity factor for shrinkage)",
+                "khc  (humidity factor for creep)",
+                "kf  (concrete strength factor, uses f'ci in ksi)",
+                "ψb  (creep coefficient)",
+                "εbdf  (shrinkage strain)",
+            ],
+            "Value  [Unit]": [
+                f"{_L['Ec']:.0f} MPa",
+                f"{_L['Eci']:.0f} MPa",
+                "197,000 MPa",
+                "0.20  [-]",
+                "0.0066 rad/m",
+                f"{_L['alpha']:.4f} rad",
+                f"{_L['L_ten']:.3f} m",
+                f"{_L['friction_slope']:.4f} MPa/m",
+                f"{_L['Lpa']:.3f} m",
+                f"{st.session_state.get('anch_slip_mm', 6.0):.1f} mm",
+                f"{_L['VS_mm']:.1f} mm",
+                f"{_L['kvs']:.4f}",
+                f"{_L['khs']:.4f}",
+                f"{_L['khc']:.4f}",
+                f"{_L['kf']:.4f}  (f'ci_ksi = {_L['fci_ksi']:.3f} ksi)",
+                f"{_L['psi_b']:.4f}",
+                f"{_L['eps_bdf']:.6f}",
+            ],
         }
         st.dataframe(pd.DataFrame(_factors), use_container_width=True)
 
