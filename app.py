@@ -678,7 +678,7 @@ try:
             "Load combinations (AASHTO Table 3.4.1-1):",
             "  Strength I  :  1.25·DC + 1.50·DW + 1.75·LL",
             "  Service  I  :  1.00·DC + 1.00·DW + 1.00·LL  (compression check)",
-            "  Service III :  1.00·DC + 1.00·DW + 0.80·LL  (tension check)",
+            "  Service I   :  1.00·DC + 1.00·DW + 1.00·LL  (compression & tension check)",
             "  Transfer    :  Pi (after immediate losses) + M_DC",
             "Strand: Post-tensioned, bonded (fully grouted), low-relaxation",
             "Sign convention: Compression (−)  |  Tension (+)",
@@ -728,7 +728,7 @@ try:
             ["Transfer — Tension (bonded)",    "+0.62·√f'ci",f"+{R['lim_tr_t']:.4f}","5.9.2.3.1b"],
             ["Service I — Comp (perm.loads)",  "−0.45·f'c",  f"{R['lim_sv_cp']:.3f}","5.9.2.3.2a"],
             ["Service I — Comp (total loads)", "−0.60·f'c",  f"{R['lim_sv_ct']:.3f}","5.9.2.3.2a"],
-            ["Service III — Tension (bonded)", "+0.50·√f'c", f"+{R['lim_sv_t']:.4f}","5.9.2.3.2b"],
+            ["Service I — Tension (bonded)",   "+0.50·√f'c", f"+{R['lim_sv_t']:.4f}","5.9.2.3.2b"],
         ], cw=[5.5,3.5,2.5,2.5])
         blank()
 
@@ -919,26 +919,26 @@ try:
         result(f"     =  {R['Aps']*1e6:.4f} mm²/m")
         blank()
 
-        h2("3.2  Jacking Stress  fpi  (after immediate losses)")
+        h2("4.2  Jacking Stress  fpi  (after immediate losses)")
         formula("fpi  =  fpu × (fpi/fpu) × (1 − Δi/100)")
         # เปลี่ยน {init_loss_pct:.1f} เป็น {_L['imm_loss_pct']:.1f}
         subst( f"     =  {fpu:.0f} × {fpi_ratio:.4f} × (1 − {_L['imm_loss_pct']:.1f}/100)")
         result(f"     =  {R['fpi_val']:.4f} MPa")
         blank()
 
-        h2("3.3  Initial Prestress Force  Pi")
+        h2("4.3  Initial Prestress Force  Pi")
         formula("Pi   =  Aps × fpi  × 10⁻³")
         subst( f"     =  {R['Aps']*1e6:.4f} mm²/m  ×  {R['fpi_val']:.4f} MPa  × 10⁻³")
         result(f"     =  {R['Pi']:.4f} kN/m")
         blank()
 
-        h2("3.4  Effective Prestress Force  Pe  (after all losses)")
+        h2("4.4  Effective Prestress Force  Pe  (after all losses)")
         formula("Pe   =  Pi × (Pe/Pi)")
         # เปลี่ยน {eff_ratio:.4f} เป็น {_L['eff_ratio']:.4f}
         subst( f"     =  {R['Pi']:.4f}  ×  {_L['eff_ratio']:.4f}")
         result(f"     =  {R['Pe']:.4f} kN/m")
 
-        h2("3.5  Section Factors")
+        h2("4.5  Section Factors")
         formula("β₁  =  0.85 − 0.05 × (f'c − 28.0)/7.0   [0.65 ≤ β₁ ≤ 0.85]")
         subst( f"    =  0.85 − 0.05 × ({fc:.1f} − 28.0)/7.0")
         result(f"    =  {R['beta1']:.4f}")
@@ -970,7 +970,6 @@ try:
             mui  = float(R["mu"][i]);      vui  = float(R["vu"][i])
             trt  = float(R["tr_top"][i]);  trb  = float(R["tr_bot"][i])
             s1t  = float(R["sv1_top"][i]); s1b  = float(R["sv1_bot"][i])
-            s3t  = float(R["sv3_top"][i]); s3b  = float(R["sv3_bot"][i])
             dpp  = float(R["dp_pos"][i]);  dpn  = float(R["dp_neg"][i])
             cpp  = float(R["c_pos"][i]);   app  = float(R["a_pos"][i])
             fpp  = float(R["fps_pos"][i])
@@ -994,7 +993,7 @@ try:
             doc.add_heading(f"4.{ks+1}   Station  x = {xi:.2f} m", level=2)
 
             # 4.x.1  Section Properties
-            h3(f"4.{ks+1}.1   Net Section Properties  (duct deducted — used at Transfer)")
+            h3(f"5.{ks+1}.1   Net Section Properties  (duct deducted — used at Transfer)")
             tbl(["Property","Formula","Substitution","Value","Unit"],[
                 ["Slab thickness",      "t",          "input",
                  f"{ti*1000:.2f}","mm"],
@@ -1021,14 +1020,11 @@ try:
             blank()
 
             # 4.x.2  Load Combinations
-            h3(f"4.{ks+1}.2   Load Combinations")
+            h3(f"5.{ks+1}.2   Load Combinations")
             tbl(["Combination","Expression","Substitution","Value","Unit"],[
                 ["Service I",
                  "Ms1 = M_DL + M_SDL + M_LL",
                  f"{mdi:.2f}+{msdi:.2f}+{mli:.2f}", f"{ms1i:.4f}","kNm/m"],
-                ["Service III",
-                 "Ms3 = M_DL + M_SDL + 0.8·M_LL",
-                 f"{mdi:.2f}+{msdi:.2f}+0.8×{mli:.2f}", f"{ms3i:.4f}","kNm/m"],
                 ["Strength I — Moment",
                  "Mu = 1.25·MDL + 1.50·MSDL + 1.75·MLL",
                  f"1.25×{mdi:.2f}+1.50×{msdi:.2f}+1.75×{mli:.2f}",
@@ -1041,7 +1037,7 @@ try:
             blank()
 
             # 4.x.3  Transfer Stress
-            h3(f"4.{ks+1}.3   Stress Check — Transfer  (AASHTO 5.9.2.3.1)")
+            h3(f"5.{ks+1}.3   Stress Check — Transfer  (AASHTO 5.9.2.3.1)")
             para("Loading: Pi + M_DL  |  Net section (duct deducted)",
                  italic=True, indent=0.3)
             blank()
@@ -1069,16 +1065,14 @@ try:
             blank()
 
             # 4.x.4  Service Stress
-            h3(f"4.{ks+1}.4   Stress Check — Service  (AASHTO 5.9.2.3.2)")
+            h3(f"5.{ks+1}.4   Stress Check — Service I  (AASHTO 5.9.2.3.2)")
             para("Gross section used (ducts grouted).  Loading: Pe + load combination.",
                  italic=True, indent=0.3)
             blank()
 
-            for (combo_name, M_i, t_s, b_s, note) in [
-                ("Service I  (compression check)",
-                 ms1i, s1t, s1b, "comp"),
-                ("Service III  (tension check)",
-                 ms3i, s3t, s3b, "tens"),
+            for (combo_name, M_i, t_s, b_s) in [
+                ("Service I  (compression & tension check)",
+                 ms1i, s1t, s1b),
             ]:
                 para(f"── {combo_name}  |  M = {M_i:.4f} kNm/m ──",
                      bold=True, indent=0.3)
@@ -1094,18 +1088,21 @@ try:
                         f" − {R['Pe']:.4f}×{ei*1000:.4f}×{yci*1000:.4f}/{Igi*1e12:.6f}×10⁻³"
                         f" + {M_i:.4f}×{yci*1000:.4f}/{Igi*1e12:.6f}×10⁻³] × 10⁻³")
                 result(f"σ_bot  =  {b_s:.6f} MPa")
-                if note == "tens":
-                    pf(b_s >= -lsv_t,
-                       f"σ_bot = {b_s:.4f} MPa  ≥  {-lsv_t:.4f} MPa  (tension limit)",
-                       f"σ_bot = {b_s:.4f} MPa  <   {-lsv_t:.4f} MPa  TENSION EXCEEDED")
-                else:
-                    pf(b_s >= lsv_ct,
-                       f"σ_bot = {b_s:.4f} MPa  ≥  {lsv_ct:.3f} MPa  (−0.60·f'c)",
-                       f"σ_bot = {b_s:.4f} MPa  <   {lsv_ct:.3f} MPa  EXCEEDS LIMIT")
+                # Compression check (bottom)
+                pf(b_s >= lsv_ct,
+                   f"σ_bot = {b_s:.4f} MPa  ≥  {lsv_ct:.3f} MPa  (−0.60·f'c)",
+                   f"σ_bot = {b_s:.4f} MPa  <   {lsv_ct:.3f} MPa  EXCEEDS LIMIT")
+                # Tension check (Service I)
+                pf(t_s <= lsv_t,
+                   f"σ_top = {t_s:.4f} MPa  ≤  +{lsv_t:.4f} MPa  (tension OK)",
+                   f"σ_top = {t_s:.4f} MPa  >  +{lsv_t:.4f} MPa  TENSION EXCEEDED")
+                pf(b_s <= lsv_t,
+                   f"σ_bot = {b_s:.4f} MPa  ≤  +{lsv_t:.4f} MPa  (tension OK)",
+                   f"σ_bot = {b_s:.4f} MPa  >  +{lsv_t:.4f} MPa  TENSION EXCEEDED")
                 blank()
 
             # 4.x.5  Flexural Strength
-            h3(f"4.{ks+1}.5   Flexural Strength Check — Strength I  (AASHTO 5.6.3)")
+            h3(f"5.{ks+1}.5   Flexural Strength Check — Strength I  (AASHTO 5.6.3)")
             para("Rectangular stress block | No mild steel | Separate +Mu / −Mu capacity",
                  italic=True, indent=0.3)
             blank()
@@ -1184,7 +1181,7 @@ try:
             blank()
 
             # 4.x.6  Shear
-            h3(f"4.{ks+1}.6   Shear Strength Check — Strength I  (AASHTO 5.7.3)")
+            h3(f"5.{ks+1}.6   Shear Strength Check — Strength I  (AASHTO 5.7.3)")
             para("Simplified method: β=2.0  |  Vs=0 (no stirrups)  |  Vp=0",
                  italic=True, indent=0.3)
             blank()
@@ -1245,8 +1242,10 @@ try:
             dcr_v = vui_/pVi_       if pVi_ > 0 else 999
             ok_tr = (R["lim_tr_c"]<=R["tr_top"][i]<=R["lim_tr_t"] and
                      R["lim_tr_c"]<=R["tr_bot"][i]<=R["lim_tr_t"])
-            ok_sv = (R["sv1_top"][i]>=R["lim_sv_ct"] and
-                     R["sv3_bot"][i]>=-R["lim_sv_t"])
+            ok_sv = (R["sv1_top"][i] >= R["lim_sv_ct"] and
+                     R["sv1_bot"][i] >= R["lim_sv_ct"] and
+                     R["sv1_top"][i] <= R["lim_sv_t"]  and
+                     R["sv1_bot"][i] <= R["lim_sv_t"])
             sum_rows.append([
                 f"{R['x'][i]:.2f}",
                 f"{R['tr_top'][i]:.3f}",  f"{R['tr_bot'][i]:.3f}",
@@ -1271,8 +1270,10 @@ try:
         all_pass = all(
             R["lim_tr_c"]<=R["tr_top"][i]<=R["lim_tr_t"] and
             R["lim_tr_c"]<=R["tr_bot"][i]<=R["lim_tr_t"] and
-            R["sv1_top"][i]>=R["lim_sv_ct"] and
-            R["sv3_bot"][i]>=-R["lim_sv_t"] and
+            R["sv1_top"][i] >= R["lim_sv_ct"] and
+            R["sv1_bot"][i] >= R["lim_sv_ct"] and
+            R["sv1_top"][i] <= R["lim_sv_t"]  and
+            R["sv1_bot"][i] <= R["lim_sv_t"]  and
             abs(float(R["mu"][i])) <= max(float(R["phi_Mn_pos"][i]),
                                           abs(float(R["phi_Mn_neg"][i]))) and
             float(R["vu"][i]) <= float(R["phi_Vn"][i])
@@ -1609,28 +1610,28 @@ try:
         st.dataframe(pd.DataFrame(rows_tr), use_container_width=True)
 
     with tabs[3]:
-        st.subheader("Stress Check — Service  (Pe + loads  |  Gross section)")
-        fig3 = make_subplots(1, 2,
-                             subplot_titles=("Service I — Compression", "Service III — Tension"))
-        for col_n, (tops, bots) in enumerate(
-            [(R["sv1_top"], R["sv1_bot"]), (R["sv3_top"], R["sv3_bot"])], 1
-        ):
-            fig3.add_trace(go.Scatter(x=R["x"], y=tops, name="Top", line_color="red"),  1, col_n)
-            fig3.add_trace(go.Scatter(x=R["x"], y=bots, name="Bot", line_color="blue"), 1, col_n)
-            fig3.add_hline(y=R["lim_sv_ct"], row=1, col=col_n,
-                           line_dash="dash", line_color="orange")
-            fig3.add_hline(y=-R["lim_sv_t"], row=1, col=col_n,
-                           line_dash="dot",  line_color="green")
-        fig3.update_layout(height=380)
+        st.subheader("Stress Check — Service I  (Pe + Ms1  |  Gross section)")
+        fig3 = go.Figure([
+            go.Scatter(x=R["x"], y=R["sv1_top"], name="Top",    line_color="red"),
+            go.Scatter(x=R["x"], y=R["sv1_bot"], name="Bottom", line_color="blue"),
+        ])
+        fig3.add_hline(y=R["lim_sv_ct"], line_dash="dash", line_color="orange",
+                       annotation_text=f"−0.60f'c = {R['lim_sv_ct']:.2f} MPa")
+        fig3.add_hline(y=R["lim_sv_cp"], line_dash="dot", line_color="goldenrod",
+                       annotation_text=f"−0.45f'c = {R['lim_sv_cp']:.2f} MPa")
+        fig3.add_hline(y=R["lim_sv_t"],  line_dash="dash", line_color="green",
+                       annotation_text=f"+0.50√f'c = +{R['lim_sv_t']:.3f} MPa")
+        fig3.update_layout(height=380, xaxis_title="x (m)", yaxis_title="Stress (MPa)")
         st.plotly_chart(fig3, use_container_width=True)
-        rows_sv = [{"x (m)": f"{R['x'][i]:.2f}",
-                    "σ_top SvcI":   f"{R['sv1_top'][i]:.4f}",
-                    "σ_bot SvcI":   f"{R['sv1_bot'][i]:.4f}",
-                    "σ_top SvcIII": f"{R['sv3_top'][i]:.4f}",
-                    "σ_bot SvcIII": f"{R['sv3_bot'][i]:.4f}",
-                    "Status": "✅" if (R["sv1_top"][i]>=R["lim_sv_ct"] and
-                                       R["sv1_bot"][i]>=R["lim_sv_ct"] and
-                                       R["sv3_bot"][i]>=-R["lim_sv_t"]) else "❌"}
+        rows_sv = [{"x (m)":       f"{R['x'][i]:.2f}",
+                    "σ_top (MPa)": f"{R['sv1_top'][i]:.4f}",
+                    "σ_bot (MPa)": f"{R['sv1_bot'][i]:.4f}",
+                    "Comp. Limit": f"{R['lim_sv_ct']:.2f}",
+                    "Tens. Limit": f"+{R['lim_sv_t']:.3f}",
+                    "Status": "✅" if (R["sv1_top"][i] >= R["lim_sv_ct"] and
+                                       R["sv1_bot"][i] >= R["lim_sv_ct"] and
+                                       R["sv1_top"][i] <= R["lim_sv_t"]  and
+                                       R["sv1_bot"][i] <= R["lim_sv_t"]) else "❌"}
                    for i in sta_idx]
         st.dataframe(pd.DataFrame(rows_sv), use_container_width=True)
 
@@ -1695,8 +1696,10 @@ try:
             pVi_= float(R["phi_Vn"][i])
             ok_tr = (R["lim_tr_c"]<=R["tr_top"][i]<=R["lim_tr_t"] and
                      R["lim_tr_c"]<=R["tr_bot"][i]<=R["lim_tr_t"])
-            ok_sv = (R["sv1_top"][i]>=R["lim_sv_ct"] and
-                     R["sv3_bot"][i]>=-R["lim_sv_t"])
+            ok_sv = (R["sv1_top"][i] >= R["lim_sv_ct"] and
+                     R["sv1_bot"][i] >= R["lim_sv_ct"] and
+                     R["sv1_top"][i] <= R["lim_sv_t"]  and
+                     R["sv1_bot"][i] <= R["lim_sv_t"])
             dcr_m = abs(mui_)/cap   if cap >0 else 999
             dcr_v = vui_/pVi_       if pVi_>0 else 999
             rows_sum.append({
