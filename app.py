@@ -920,22 +920,23 @@ try:
         blank()
 
         h2("3.2  Jacking Stress  fpi  (after immediate losses)")
-        formula("fpi  =  fpu × (fpi/fpu) × (1 − Δi/100)")
-        subst( f"     =  {fpu:.0f} × {fpi_ratio:.4f} × (1 − {init_loss_pct:.1f}/100)")
-        result(f"     =  {R['fpi_val']:.4f} MPa")
-        blank()
+                   formula("fpi  =  fpu × (fpi/fpu) × (1 − Δi/100)")
+                  # เปลี่ยน {init_loss_pct:.1f} เป็น {_L['imm_loss_pct']:.1f}
+                  subst( f"     =  {fpu:.0f} × {fpi_ratio:.4f} × (1 − {_L['imm_loss_pct']:.1f}/100)")
+                  result(f"     =  {R['fpi_val']:.4f} MPa")
+                  blank()
 
-        h2("3.3  Initial Prestress Force  Pi")
-        formula("Pi   =  Aps × fpi  × 10⁻³")
-        subst( f"     =  {R['Aps']*1e6:.4f} mm²/m  ×  {R['fpi_val']:.4f} MPa  × 10⁻³")
-        result(f"     =  {R['Pi']:.4f} kN/m")
-        blank()
+                  h2("3.3  Initial Prestress Force  Pi")
+                 formula("Pi   =  Aps × fpi  × 10⁻³")
+                 subst( f"     =  {R['Aps']*1e6:.4f} mm²/m  ×  {R['fpi_val']:.4f} MPa  × 10⁻³")
+                 result(f"     =  {R['Pi']:.4f} kN/m")
+                  blank()
 
-        h2("3.4  Effective Prestress Force  Pe  (after all losses)")
-        formula("Pe   =  Pi × (Pe/Pi)")
-        subst( f"     =  {R['Pi']:.4f}  ×  {eff_ratio:.4f}")
-        result(f"     =  {R['Pe']:.4f} kN/m")
-        blank()
+                 h2("3.4  Effective Prestress Force  Pe  (after all losses)")
+                 formula("Pe   =  Pi × (Pe/Pi)")
+                 # เปลี่ยน {eff_ratio:.4f} เป็น {_L['eff_ratio']:.4f}
+                 subst( f"     =  {R['Pi']:.4f}  ×  {_L['eff_ratio']:.4f}")
+                 result(f"     =  {R['Pe']:.4f} kN/m")
 
         h2("3.5  Section Factors")
         formula("β₁  =  0.85 − 0.05 × (f'c − 28.0)/7.0   [0.65 ≤ β₁ ≤ 0.85]")
