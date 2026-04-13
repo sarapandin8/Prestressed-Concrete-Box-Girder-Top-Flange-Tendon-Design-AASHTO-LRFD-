@@ -3,3 +3,4 @@ plotly>=5.10.0
 pandas>=1.5.0
 numpy>=1.23.0
 python-docx>=0.8.11
+kaleido==0.2.1
