@@ -596,17 +596,19 @@ try:
     N       = len(R["x"])
 
     # ─────────────────────────────────────────────────────────────────
-        # 5. REPORT GENERATOR (v4 - เพิ่มรูป Section + Stress)
-        # ─────────────────────────────────────────────────────────────────
+    # 5. REPORT GENERATOR (v4 - เพิ่มรูป Section + Stress)
+    # ─────────────────────────────────────────────────────────────────
+      
         def fig_to_png(fig, width=900, height=400):
-            """แปลง Plotly fig เป็น BytesIO PNG แบบปลอดภัย ไม่กระทบโค้ดหลัก"""
-            try:
-                img_bytes = fig.to_image(format="png", width=width, height=height, scale=2)
-                return BytesIO(img_bytes)
-            except Exception as e:
-                st.warning(f"สร้างรูปไม่ได้: {e} | ตรวจสอบว่า requirements.txt มี kaleido แล้ว")
-                return None
-        def make_report():
+    """แปลง Plotly fig เป็น BytesIO PNG แบบปลอดภัย ไม่กระทบโค้ดหลัก"""
+    try:
+        img_bytes = fig.to_image(format="png", width=width, height=height, scale=2)
+        return BytesIO(img_bytes)
+    except Exception as e:
+        st.warning(f"สร้างรูปไม่ได้: {e} | ตรวจสอบว่า requirements.txt มี kaleido แล้ว")
+        return None
+
+    def make_report():
     doc = Document()
     for sec in doc.sections:
         sec.top_margin=Cm(2.0); sec.bottom_margin=Cm(2.0)
