@@ -1,7 +1,6 @@
 """
 PSC Box Girder — Top Flange Transverse Design (v4 with Word Images)
 AASHTO LRFD Bridge Design Specifications | 1.0 m transverse strip
-
 v4: เพิ่ม fig_to_png + รูป Section/Transfer/Service ใน make_report()
 """
 
@@ -38,13 +37,13 @@ DEFAULT_TABLES = dict(
     df_thickness={"x (m)": [0.00, 1.00, 2.00, 3.00, 4.00, 5.00, 6.00, 7.00, 8.00, 9.00, 10.00, 11.00, 12.00], "t (m)": [0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250]},
     df_tendon={"x (m)": [0.00, 1.00, 2.00, 3.00, 4.00, 5.00, 6.00, 7.00, 8.00, 9.00, 10.00, 11.00, 12.00], "z_top (m)": [0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100]},
     df_load={
-        "x (m)": [ 0.00, 1.00, 2.00, 3.00, 4.00, 5.00, 6.00, 7.00, 8.00, 9.00, 10.00, 11.00, 12.00],
-        "M_DL (kNm/m)": [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00],
-        "V_DL (kN/m)": [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00],
-        "M_SDL (kNm/m)": [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00],
-        "V_SDL (kN/m)": [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00],
-        "M_LL (kNm/m)": [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00],
-        "V_LL (kN/m)": [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00],
+        "x (m)": [0.00, 1.00, 2.00, 3.00, 4.00, 5.00, 6.00, 7.00, 8.00, 9.00, 10.00, 11.00, 12.00],
+        "M_DL (kNm/m)": [0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00],
+        "V_DL (kN/m)": [0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00],
+        "M_SDL (kNm/m)": [0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00],
+        "V_SDL (kN/m)": [0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00],
+        "M_LL (kNm/m)": [0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00],
+        "V_LL (kN/m)": [0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00],
     },
 )
 
@@ -431,7 +430,7 @@ try:
 
     # ─────────────────────────────────────────────────────────────────
     # 5. REPORT GENERATOR (v4 - เพิ่มรูป Section + Stress)
-    # ─────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────
     def fig_to_png(fig, width=900, height=400):
         """แปลง Plotly fig เป็น BytesIO PNG แบบปลอดภัย ไม่กระทบโค้ดหลัก"""
         try:
@@ -514,4 +513,625 @@ try:
             "Code: AASHTO LRFD Bridge Design Specifications",
             "Analysis basis: 1.0 m transverse strip across top flange",
             "Load combinations (AASHTO Table 3.4.1-1):",
-            " Strength I : 1.25
+            " Strength I : 1.25·DC + 1.50·DW + 1.75·LL",
+            " Service I : 1.00·DC + 1.00·DW + 1.00·LL (compression & tension check)",
+            " Transfer : Pi (after immediate losses) + M_DC",
+            "Strand: Post-tensioned, bonded (fully grouted), low-relaxation",
+            "Sign convention: Compression (−) | Tension (+)",
+            "Positive moment = sagging (compression at TOP fibre)",
+        ]: para(it, indent=0.3)
+        blank()
+
+        # SEC 2 — INPUT SUMMARY + รูปที่ 1: SECTION
+        h1("2. Design Input Summary")
+
+        h2("2.1 Material Properties")
+        tbl(["Parameter","
+
+        h2("2.1 Material Properties")
+        tbl(["Parameter","Symbol","Value","Unit","Reference"],[
+            ["Concrete — service", "f'c", f"{fc:.1f}", "MPa","AASHTO 5.4.2"],
+            ["Concrete — transfer", "f'ci", f"{fci:.1f}", "MPa","AASHTO 5.9.2"],
+            ["Strand tensile strength", "fpu", f"{fpu:.0f}", "MPa","AASHTO 5.4.4"],
+            ["Strand yield ratio", "fpy/fpu", f"{fpy_ratio:.2f}", "—", "Low-relax"],
+            ["Area per strand", "asp", f"{aps_strand:.1f}", "mm²","Product data"],
+            ["PT duct outer diameter", "d_duct", f"{duct_dia_mm:.0f}","mm", "Supplier"],
+        ], cw=[4.5,2.0,1.5,4.5])
+        blank()
+
+        h2("2.2 Prestressing Configuration")
+        tbl(["Parameter","Symbol","Value","Unit"],[
+            ["Tendons per 1 m strip", "n_t", f"{int(num_tendon)}", "—"],
+            ["Strands per tendon", "n_s", f"{int(n_strands)}", "—"],
+            ["Total strands (1m strip)", "n", f"{R['n_total']}", "—"],
+            ["Total Aps (1m strip)", "Aps", f"{R['Aps']*1e6:.2f}", "mm²/m"],
+            ["Jacking stress ratio", "fpi/fpu", f"{fpi_ratio:.4f}", "—"],
+            ["Immediate loss (computed)", "Δfi", f"{R['L']['imm_loss_pct']:.2f}", "%"],
+            ["Long-term loss (computed)", "ΔfLT", f"{R['L']['lt_loss_pct']:.2f}", "%"],
+            ["Total loss (computed)", "Δftot", f"{R['L']['total_loss_pct']:.2f}","%"],
+        ], cw=[5.5,2.0])
+        blank()
+
+        h2("2.3 Resistance Factors")
+        tbl(["Limit State","Symbol","Value"],[
+            ["Flexure","φ_f",f"{phi_flex:.2f}"],
+            ["Shear", "φ_v",f"{phi_shear:.2f}"],
+        ], cw=[6.0,2.5,2.5])
+        blank()
+
+        h2("2.4 Allowable Stress Limits")
+        tbl(["Condition","Expression","Limit (MPa)","Article"],[
+            ["Transfer — Compression", "−0.60·f'ci", f"{R['lim_tr_c']:.3f}","5.9.2.3.1a"],
+            ["Transfer — Tension (bonded)", "+0.62·√f'ci",f"+{R['lim_tr_t']:.4f}","5.9.2.3.1b"],
+            ["Service I — Comp (perm.loads)", "−0.45·f'c", f"{R['lim_sv_cp']:.3f}","5.9.2.3.2a"],
+            ["Service I — Comp (total loads)", "−0.60·f'c", f"{R['lim_sv_ct']:.3f}","5.9.2.3.2a"],
+            ["Service I — Tension (bonded)", "+0.50·√f'c", f"+{R['lim_sv_t']:.4f}","5.9.2.3.2b"],
+        ], cw=[5.5,3.5,2.5])
+        blank()
+
+        h2("2.5 Input Geometry and Load at Stations")
+        geo_rows = []
+        for i in sta_idx:
+            geo_rows.append([
+                f"{R['x'][i]:.2f}",
+                f"{R['t'][i]*1000:.2f}", f"{R['z'][i]*1000:.2f}", f"{R['yc'][i]*1000:.2f}",
+                f"{R['e'][i]*1000:.2f}",
+                f"{R['m_dl'][i]:.2f}", f"{R['m_sdl'][i]:.2f}", f"{R['m_ll'][i]:.2f}",
+                f"{R['v_dl'][i]:.2f}", f"{R['v_sdl'][i]:.2f}", f"{R['v_ll'][i]:.2f}",
+            ])
+        tbl(["x(m)","t(mm)","z(mm)","yc(mm)","e(mm)",
+             "M_DL","M_SDL","M_LL","V_DL","V_SDL","V_LL"],
+            geo_rows, cw=[1.4,1.6])
+        para(" M in kNm/m | V in kN/m", italic=True, color=C_GRAY)
+        blank()
+
+        # ── รูปที่ 1: Section Geometry ───────────────────────────────────
+        try:
+            x_m = R["x"]; N = len(x_m)
+            top_mm = np.zeros(N); bot_mm = -R["t"] * 1000.0
+            cg_mm = -R["yc"] * 1000.0; tdn_mm = -R["z"] * 1000.0
+            fig_sec = go.Figure()
+            fig_sec.add_trace(go.Scatter(
+                x=np.concatenate([x_m, x_m[::-1]]),
+                y=np.concatenate([top_mm, bot_mm[::-1]]),
+                fill="toself", fillcolor="rgba(173, 204, 240, 0.45)",
+                line=dict(color="steelblue", width=1.5), name="Top Flange"
+            ))
+            fig_sec.add_trace(go.Scatter(x=x_m, y=cg_mm, mode="lines",
+                line=dict(color="gray", dash="dot", width=1), name="Section CG"))
+            fig_sec.add_trace(go.Scatter(x=x_m, y=tdn_mm, mode="lines",
+                line=dict(color="red", width=2.0), name="Tendon CGS"))
+            fig_sec.add_vline(x=cl_lweb, line=dict(color="rgba(200,100,0,0.9)", dash="dash"),
+                annotation_text="<b>CL. L.Web</b>", annotation_position="top right")
+            fig_sec.add_vline(x=cl_rweb, line=dict(color="rgba(200,100,0,0.9)", dash="dash"),
+                annotation_text="<b>CL. R.Web</b>", annotation_position="top left")
+            fig_sec.update_layout(
+                title="Figure 2.1: Cross-Section with Tendon Layout",
+                xaxis_title="Distance from Left Edge (m)", yaxis_title="Depth (mm)",
+                height=400, width=900, plot_bgcolor="white",
+                legend=dict(orientation="h", y=-0.2)
+            )
+            img1 = fig_to_png(fig_sec)
+            if img1:
+                h3("2.6 Section Geometry Plot")
+                doc.add_picture(img1, width=Inches(6.5))
+                doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                blank()
+        except Exception as e:
+            para(f"[ข้ามรูป Section: {e}]", color=C_GRAY, italic=True)
+
+        doc.add_page_break()
+
+        # ══════════════════════════════════════════════════════════════
+        # SEC 3 — PRESTRESS LOSS
+        # ══════════════════════════════════════════════════════════════
+        h1("3. Prestress Loss Calculation (AASHTO LRFD 5.9.3)")
+        _L = R["L"]; _fpj = _L["fpj"]
+
+        h2("3.1 Loss Summary")
+        tbl(["Loss Type","Value (MPa)","% of fpj"],[
+            ["Immediate Δfi", f"{_L['delta_imm']:.2f}", f"{_L['imm_loss_pct']:.2f}"],
+            ["Long-term ΔfLT", f"{_L['delta_lt']:.2f}", f"{_L['lt_loss_pct']:.2f}"],
+            ["Total Δftotal", f"{_L['delta_imm']+_L['delta_lt']:.2f}", f"{_L['total_loss_pct']:.2f}"],
+            ["Effective fpe", f"{_L['fpe']:.2f}", f"{_L['fpe']/_fpj*100:.1f}"],
+        ], cw=[4,3,3])
+        blank()
+        result(f"Pe = {_L['Pe']:.2f} kN/m")
+        blank()
+
+        h2("3.2 Section Properties at Mid-span")
+        tbl(["Parameter","Symbol","Value","Unit"],[
+            ["Thickness","t", f"{_L['t_mid']*1000:.1f}", "mm"],
+            ["Tendon depth from top","z", f"{_L['z_mid']*1000:.1f}","mm"],
+            ["Eccentricity","e", f"{_L['e_mid']*1000:.1f}","mm"],
+            ["Gross Area (1m)","Ag", f"{_L['Ag_mid']*1e6:.0f}","mm²"],
+            ["Net Area (1m)","An", f"{_L['An_mid']*1e6:.0f}","mm²"],
+            ["Gross Inertia","Ig", f"{_L['Ig_mid']*1e12:.2e}","mm⁴"],
+            ["Net Inertia","In", f"{_L['In_mid']*1e12:.2e}","mm⁴"],
+            ["V/S ratio","V/S", f"{_L['VS']*1000:.1f}","mm"],
+        ], cw=[5,2,2.5])
+        blank()
+
+        h2("3.3 Immediate Loss Components")
+        h3("3.3.1 Friction Loss — Δf_f (AASHTO 5.9.3.2.2)")
+        formula("Δf_f = f_pj · (1 − e^(−(μ·α + K·L)))")
+        subst(f"f_pj = f_pu × f_pi/f_pu = {fpu:.0f} × {fpi_ratio:.3f} = {_fpj:.2f} MPa")
+        subst(f"μ = 0.20, K = 0.0066 rad/m, α = {_L['alpha']:.4f} rad")
+        subst(f"L_tendon = {_L['L_ten']:.3f} m")
+        subst(f"Exponent = μ·α + K·L = 0.20×{_L['alpha']:.4f} + 0.0066×{_L['L_ten']:.3f} = {_L['alpha']*0.20 + 0.0066*_L['L_ten']:.4f}")
+        result(f"Δf_f (full) = {_fpj:.2f} × (1 − e^−{_L['alpha']*0.20 + 0.0066*_L['L_ten']:.4f}) = {_L['delta_fpF_full']:.2f} MPa")
+        result(f"Δf_f (mid) = {_L['delta_fpF']:.2f} MPa")
+        blank()
+
+        h3("3.3.2 Anchorage Seating — Δf_a (AASHTO 5.9.3.2.1)")
+        formula("Δf_a = (Δ_anch × E_p) / L_pa")
+        subst(f"Δ_anch = {anch_slip_mm:.1f} mm = {anch_slip_mm/1000:.5f} m")
+        subst(f"E_p = {_L['Ep']:.0f} MPa")
+        subst(f"L_pa = {_L['Lpa']:.3f} m")
+        result(f"Δf_a = {_L['delta_fpA']:.2f} MPa")
+        para(f"Note: L_pa < L/2, so Δf_a affects only anchorage region", italic=True, color=C_GRAY, indent=0.5)
+        blank()
+
+        h3("3.3.3 Elastic Shortening — Δf_ES (AASHTO 5.9.3.2.3)")
+        formula("Δf_ES = (E_p / E_ci) × f_cgp")
+        subst(f"E_p = {_L['Ep']:.0f} MPa, E_ci = {_L['Eci']:.0f} MPa")
+        subst(f"f_cgp = (P_i/A_n + P_i·e²/I_n) = {_L['fcgp']:.3f} MPa")
+        result(f"Δf_ES = {_L['delta_fpES']:.2f} MPa")
+        blank()
+
+        h3("3.3.4 Total Immediate Loss")
+        formula("Δf_i = Δf_f + Δf_a + Δf_ES")
+        result(f"Δf_i = {_L['delta_fpF']:.2f} + {_L['delta_fpA']:.2f} + {_L['delta_fpES']:.2f} = {_L['delta_imm']:.2f} MPa")
+        result(f"%Loss = {_L['imm_loss_pct']:.2f} % of f_pj")
+        result(f"f_pi (after immediate) = {_fpj:.2f} − {_L['delta_imm']:.2f} = {_L['fpi_eff']:.2f} MPa")
+        result(f"P_i = A_ps × f_pi = {R['Aps']*1e6:.1f} × {_L['fpi_eff']:.2f} / 1000 = {_L['Pi']:.2f} kN/m")
+        blank()
+
+        h2("3.4 Long-Term Loss Components")
+        h3("3.4.1 Shrinkage — Δf_SH (AASHTO 5.9.3.3)")
+        formula("Δf_SH = ε_bd × E_p")
+        subst(f"k_vs = max(1.45 − 0.0052·V/S, 1.0) = {_L['kvs']:.3f}")
+        subst(f"k_hs = max(2.00 − 0.014·RH, 0.0) = {_L['khs']:.3f}")
+        subst(f"k_f = 5 / (1 + f'_ci) = {_L['kf']:.3f}")
+        subst(f"ε_bd = k_vs × k_hs × k_f × k_td × 0.48×10⁻³ = {_L['eps_bdf']*1e3:.3f} ×10⁻³")
+        result(f"Δf_SH = {_L['eps_bdf']*1e6:.1f} × 10⁻⁶ × {_L['Ep']:.0f} = {_L['delta_fpSH']:.2f} MPa")
+        blank()
+
+        h3("3.4.2 Creep — Δf_CR (AASHTO 5.9.3.4)")
+        formula("Δf_CR = (E_p / E_c) × f_cgp × ψ_b")
+        subst(f"E_c = {_L['Ec']:.0f} MPa")
+        subst(f"ψ_b = 1.9 × k_vs × k_hc × k_f × k_td × t_i⁻⁰·¹¹⁸ = {_L['psi_b']:.3f}")
+        subst(f"f_cgp (long-term) = {_L['fcgp_lt']:.3f} MPa")
+        result(f"Δf_CR = {_L['delta_fpCR']:.2f} MPa")
+        blank()
+
+        h3("3.4.3 Relaxation — Δf_R (AASHTO 5.9.3.5)")
+        formula("Δf_R = (f_pt / K_L) × (f_pt / f_py − 0.55)")
+        subst(f"f_pt = f_pi − 0.3×(Δf_SH + Δf_CR) = {_L['fpi_eff'] - 0.3*(_L['delta_fpSH']+_L['delta_fpCR']):.2f} MPa")
+        subst(f"K_L = 45, f_py = 0.9×f_pu = {fpu*0.9:.0f} MPa")
+        result(f"Δf_R = {_L['delta_fpR']:.2f} MPa")
+        blank()
+
+        h3("3.4.4 Total Long-Term Loss")
+        formula("Δf_LT = Δf_SH + Δf_CR + Δf_R")
+        result(f"Δf_LT = {_L['delta_fpSH']:.2f} + {_L['delta_fpCR']:.2f} + {_L['delta_fpR']:.2f} = {_L['delta_lt']:.2f} MPa")
+        result(f"%Loss = {_L['lt_loss_pct']:.2f} % of f_pj")
+        blank()
+
+        h2("3.5 Effective Prestress Force")
+        formula("f_pe = f_pj − Δf_i − Δf_LT")
+        result(f"f_pe = {_fpj:.2f} − {_L['delta_imm']:.2f} − {_L['delta_lt']:.2f} = {_L['fpe']:.2f} MPa")
+        result(f"P_e = A_ps × f_pe = {R['Aps']*1e6:.1f} × {_L['fpe']:.2f} / 1000 = {_L['Pe']:.2f} kN/m")
+        result(f"Total Loss = {_L['total_loss_pct']:.2f} % | Efficiency = {_L['eff_ratio']*100:.1f} %")
+        doc.add_page_break()
+
+        # ══════════════════════════════════════════════════════════════
+        # SEC 4 — STRESS DIAGRAMS + รูปที่ 2,3
+        # ══════════════════════════════════════════════════════════════
+        h1("4. Stress & Strength Results")
+
+        # ── รูปที่ 2: Transfer Stress ───────────────────────────────────
+        try:
+            fig_tr = go.Figure([
+                go.Scatter(x=R["x"], y=R["tr_top"], name="Top", line_color="red"),
+                go.Scatter(x=R["x"], y=R["tr_bot"], name="Bottom", line_color="blue"),
+            ])
+            fig_tr.add_hline(y=R["lim_tr_c"], line_dash="dash", line_color="orange",
+                           annotation_text=f"−0.60f'ci = {R['lim_tr_c']:.2f} MPa")
+            fig_tr.add_hline(y=R["lim_tr_t"], line_dash="dash", line_color="green",
+                           annotation_text=f"+0.62√f'ci = +{R['lim_tr_t']:.3f} MPa")
+            fig_tr.update_layout(
+                title="Figure 4.1: Transfer Stress (Pi + M_DL)",
+                xaxis_title="x (m)", yaxis_title="Stress (MPa)",
+                height=380, width=900, plot_bgcolor="white"
+            )
+            img2 = fig_to_png(fig_tr)
+            if img2:
+                h2("4.1 Transfer Stress Diagram")
+                doc.add_picture(img2, width=Inches(6.5))
+                doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                blank()
+        except Exception as e:
+            para(f"[ข้ามรูป Transfer: {e}]", color=C_GRAY, italic=True)
+
+        # ── รูปที่ 3: Service Stress ───────────────────────────────────
+        try:
+            fig_sv = go.Figure([
+                go.Scatter(x=R["x"], y=R["sv1_top"], name="Top", line_color="red"),
+                go.Scatter(x=R["x"], y=R["sv1_bot"], name="Bottom", line_color="blue"),
+            ])
+            fig_sv.add_hline(y=R["lim_sv_ct"], line_dash="dash", line_color="orange",
+                           annotation_text=f"−0.60f'c = {R['lim_sv_ct']:.2f} MPa")
+            fig_sv.add_hline(y=R["lim_sv_t"], line_dash="dash", line_color="green",
+                           annotation_text=f"+0.50√f'c = +{R['lim_sv_t']:.3f} MPa")
+            fig_sv.update_layout(
+                title="Figure 4.2: Service I Stress (Pe + Ms1)",
+                xaxis_title="x (m)", yaxis_title="Stress (MPa)",
+                height=380, width=900, plot_bgcolor="white"
+            )
+            img3 = fig_to_png(fig_sv)
+            if img3:
+                h2("4.2 Service Stress Diagram")
+                doc.add_picture(img3, width=Inches(6.5))
+                doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                blank()
+        except Exception as e:
+            para(f"[ข้ามรูป Service: {e}]", color=C_GRAY, italic=True)
+
+        doc.add_page_break()
+
+        # ══════════════════════════════════════════════════════════════
+        # SEC 5 — STATION-BY-STATION DETAILED
+        # ══════════════════════════════════════════════════════════════
+        h1("5. Station-by-Station Detailed Calculation")
+
+        for k, i in enumerate(sta_idx):
+            h2(f"5.{k+1} Station x = {R['x'][i]:.2f} m")
+
+            h3("5.x.1 Section Properties")
+            tbl(["Parameter","Symbol","Value","Unit"],[
+                ["Thickness","t", f"{s('t',i)*1000:.1f}", "mm"],
+                ["Tendon depth from top","z", f"{s('z',i)*1000:.1f}","mm"],
+                ["Centroid from top","y_c", f"{s('yc',i)*1000:.1f}","mm"],
+                ["Eccentricity","e", f"{s('e',i)*1000:.1f}","mm"],
+                ["Gross Area (1m)","A_g", f"{s('Ag',i)*1e6:.0f}","mm²"],
+                ["Net Area (1m)","A_n", f"{s('An',i)*1e6:.0f}","mm²"],
+                ["Gross Inertia","I_g", f"{s('Ig',i)*1e12:.2e}","mm⁴"],
+                ["Net Inertia","I_n", f"{s('In',i)*1e12:.2e}","mm⁴"],
+            ], cw=[4,2,2.5])
+            blank()
+
+            h3("5.x.2 Applied Loads")
+            tbl(["Load Case","M (kNm/m)","V (kN/m)"],[
+                ["DL", f"{s('m_dl',i):.2f}", f"{s('v_dl',i):.2f}"],
+                ["SDL", f"{s('m_sdl',i):.2f}", f"{s('v_sdl',i):.2f}"],
+                ["LL", f"{s('m_ll',i):.2f}", f"{s('v_ll',i):.2f}"],
+                ["Service I", f"{s('ms1',i):.2f}", f"{s('v_dl',i)+s('v_sdl',i)+s('v_ll',i):.2f}"],
+                ["Strength I", f"{s('mu',i):.2f}", f"{s('vu',i):.2f}"],
+            ], cw=[3,2.5,2.5])
+            blank()
+
+            h3("5.x.3 Transfer Stage Stress Check")
+            formula("f_top = −P_i/A_n + P_i·e·(t/2)/I_n − M_DL·(t/2)/I_n")
+            subst(f"P_i = {R['Pi']:.2f} kN/m, M_DL = {s('m_dl',i):.2f} kNm/m")
+            result(f"f_top = {s('tr_top',i):.3f} MPa")
+            pf(R['lim_tr_c'] <= s('tr_top',i) <= R['lim_tr_t'], "Transfer Top OK", "Transfer Top FAIL")
+            blank()
+            formula("f_bot = −P_i/A_n − P_i·e·(t/2)/I_n + M_DL·(t/2)/I_n")
+            result(f"f_bot = {s('tr_bot',i):.3f} MPa")
+            pf(R['lim_tr_c'] <= s('tr_bot',i) <= R['lim_tr_t'], "Transfer Bot OK", "Transfer Bot FAIL")
+            blank()
+
+            h3("5.x.4 Service Stage Stress Check")
+            formula("f_top = −P_e/A_g + P_e·e·(t/2)/I_g − M_s1·(t/2)/I_g")
+            subst(f"P_e = {R['Pe']:.2f} kN/m, M_s1 = {s('ms1',i):.2f} kNm/m")
+            result(f"f_top = {s('sv1_top',i):.3f} MPa")
+            pf(R['lim_sv_ct'] <= s('sv1_top',i) <= R['lim_sv_t'], "Service Top OK", "Service Top FAIL")
+            blank()
+            formula("f_bot = −P_e/A_g − P_e·e·(t/2)/I_g + M_s1·(t/2)/I_g")
+            result(f"f_bot = {s('sv1_bot',i):.3f} MPa")
+            pf(R['lim_sv_ct'] <= s('sv1_bot',i) <= R['lim_sv_t'], "Service Bot OK", "Service Bot FAIL")
+            blank()
+
+            h3("5.x.5 Flexural Strength Check")
+            formula("M_n = A_ps × f_ps × (d_p − a/2)")
+            subst(f"d_p = {s('dp_pos',i)*1000:.1f} mm (sagging)")
+            subst(f"c = {s('c_pos',i)*1000:.1f} mm, a = β₁·c = {s('a_pos',i)*1000:.1f} mm")
+            subst(f"f_ps = {s('fps_pos',i):.1f} MPa")
+            result(f"φM_n = {s('phi_Mn_pos',i):.2f} kNm/m")
+            result(f"M_u = {s('mu',i):.2f} kNm/m")
+            pf(abs(s('mu',i)) <= abs(s('phi_Mn_pos',i)), f"Flexure OK (DCR={abs(s('mu',i)/s('phi_Mn_pos',i)):.3f})", "Flexure FAIL")
+            blank()
+
+            h3("5.x.6 Shear Strength Check")
+            formula("V_c = 0.083 × β × √f'_c × b × d_v")
+            subst(f"d_v = max(0.9d, 0.72t) = {s('dv',i)*1000:.1f} mm")
+            result(f"φV_n = φ × min(V_c, 0.25f'_c·b·d_v) = {s('phi_Vn',i):.2f} kN/m")
+            result(f"V_u = {s('vu',i):.2f} kN/m")
+            pf(s('vu',i) <= s('phi_Vn',i), f"Shear OK (DCR={s('vu',i)/s('phi_Vn',i):.3f})", "Shear FAIL")
+
+            if k < len(sta_idx) - 1:
+                doc.add_page_break()
+
+        # ══════════════════════════════════════════════════════════════
+        # SEC 6 — SUMMARY TABLE
+        # ══════════════════════════════════════════════════════════════
+        doc.add_page_break()
+        h1("6. Summary of Results — All Stations")
+        sum_rows = []
+        for i in sta_idx:
+            mui_ = float(R["mu"][i]); vui_ = float(R["vu"][i])
+            cap = (float(R["phi_Mn_pos"][i]) if mui_>=0
+                   else abs(float(R["phi_Mn_neg"][i])))
+            pVi_ = float(R["phi_Vn"][i])
+            ok_tr = (R["lim_tr_c"]<=R["tr_top"][i]<=R["lim_tr_t"] and
+                     R["lim_tr_c"]<=R["tr_bot"][i]<=R["lim_tr_t"])
+            ok_sv = (R["sv1_top"][i] >= R["lim_sv_ct"] and
+                     R["sv1_bot"][i] >= R["lim_sv_ct"] and
+                     R["sv1_top"][i] <= R["lim_sv_t"] and
+                     R["sv1_bot"][i] <= R["lim_sv_t"])
+            dcr_m = abs(mui_)/cap if cap >0 else 999
+            dcr_v = vui_/pVi_ if pVi_>0 else 999
+            sum_rows.append({
+                "x (m)": f"{R['x'][i]:.2f}",
+                "Transfer": "✅" if ok_tr else "❌",
+                "Service": "✅" if ok_sv else "❌",
+                "DCR_M": f"{dcr_m:.3f}",
+                "Flexure": "✅" if abs(mui_)<=cap else "❌",
+                "DCR_V": f"{dcr_v:.3f}",
+                "Shear": "✅" if vui_<=pVi_ else "❌",
+            })
+        df_sum = pd.DataFrame(sum_rows)
+        tbl(list(df_sum.columns), df_sum.values.tolist(), cw=[1.2,1.4])
+        blank()
+
+        all_ok = all(
+            r["Transfer"]=="✅" and r["Service"]=="✅" and
+            r["Flexure"]=="✅" and r["Shear"]=="✅"
+            for r in sum_rows
+        )
+        if all_ok:
+            para("► OVERALL: The top flange tendon design is ADEQUATE for all "
+                 "AASHTO LRFD limit states checked.",
+                 bold=True, color=C_GREEN)
+        else:
+            para("► OVERALL: The design does NOT satisfy all limit states. "
+                 "Revise tendon layout, spacing, or section geometry.",
+                 bold=True, color=C_RED)
+        blank()
+        para("─── END OF CALCULATION ───", color=C_GRAY,
+             align=WD_ALIGN_PARAGRAPH.CENTER)
+
+        buf = BytesIO()
+        doc.save(buf)
+        buf.seek(0)
+        return buf
+
+except Exception as e:
+    st.error(f"Calculation Error: {e}")
+    st.stop()
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 6. TABS FOR RESULTS DISPLAY
+# ─────────────────────────────────────────────────────────────────────────────
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+    "📊 Section & Tendon", "📉 Prestress Loss", "📈 Stress Envelopes",
+    "💪 Flexural Capacity", "✂️ Shear Capacity", "📋 Station Tables", "📄 Report"
+])
+
+with tab1:
+    st.subheader("Cross-Section Geometry")
+    x_m = R["x"]; N = len(x_m)
+    top_mm = np.zeros(N); bot_mm = -R["t"] * 1000.0
+    cg_mm = -R["yc"] * 1000.0; tdn_mm = -R["z"] * 1000.0
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=np.concatenate([x_m, x_m[::-1]]),
+        y=np.concatenate([top_mm, bot_mm[::-1]]),
+        fill="toself", fillcolor="rgba(173, 204, 240, 0.45)",
+        line=dict(color="steelblue", width=1.5), name="Top Flange"
+    ))
+    fig.add_trace(go.Scatter(x=x_m, y=cg_mm, mode="lines",
+        line=dict(color="gray", dash="dot", width=1), name="Section CG"))
+    fig.add_trace(go.Scatter(x=x_m, y=tdn_mm, mode="lines",
+        line=dict(color="red", width=2.0), name="Tendon CGS"))
+    fig.add_vline(x=cl_lweb, line=dict(color="rgba(200,100,0,0.9)", dash="dash"),
+        annotation_text="<b>CL. L.Web</b>", annotation_position="top right")
+    fig.add_vline(x=cl_rweb, line=dict(color="rgba(200,100,0,0.9)", dash="dash"),
+        annotation_text="<b>CL. R.Web</b>", annotation_position="top left")
+    fig.update_layout(
+        title="Cross-Section with Tendon Layout",
+        xaxis_title="Distance from Left Edge (m)", yaxis_title="Depth (mm)",
+        height=500, plot_bgcolor="white",
+        legend=dict(orientation="h", y=-0.15)
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    st.info(f"**Flange width:** {width:.2f} m | **Web Span:** {(cl_rweb-cl_lweb)*1000:.0f} mm")
+
+with tab2:
+    st.subheader("Prestress Loss Breakdown")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Jacking Stress f_pj", f"{L['fpj']:.1f} MPa", f"{fpi_ratio*100:.0f}% f_pu")
+        st.metric("After Immediate Loss", f"{L['fpi_eff']:.1f} MPa", f"−{L['imm_loss_pct']:.2f}%")
+        st.metric("Effective Stress f_pe", f"{L['fpe']:.1f} MPa", f"−{L['total_loss_pct']:.2f}%")
+    with col2:
+        st.metric("Immediate Loss Δf_i", f"{L['delta_imm']:.1f} MPa", f"{L['imm_loss_pct']:.2f}% of f_pj")
+        st.metric("Long-term Loss Δf_LT", f"{L['delta_lt']:.1f} MPa", f"{L['lt_loss_pct']:.2f}% of f_pj")
+        st.metric("Effective Force P_e", f"{L['Pe']:.1f} kN/m", f"Efficiency: {L['eff_ratio']*100:.1f}%")
+
+    st.markdown("---")
+    st.subheader("Loss Components")
+    loss_df = pd.DataFrame({
+        "Component": ["Friction", "Anchorage", "Elastic Shortening", "Shrinkage", "Creep", "Relaxation"],
+        "Value (MPa)": [L['delta_fpF'], L['delta_fpA'], L['delta_fpES'],
+                       L['delta_fpSH'], L['delta_fpCR'], L['delta_fpR']],
+        "Type": ["Immediate", "Immediate", "Immediate", "Long-term", "Long-term"]
+    })
+    fig_loss = go.Figure(data=[go.Bar(
+        x=loss_df["Component"], y=loss_df["Value (MPa)"],
+        marker_color=loss_df["Type"].map({"Immediate": "lightcoral", "Long-term": "lightblue"})
+    )])
+    fig_loss.update_layout(title="Prestress Loss Components", yaxis_title="Loss (MPa)", height=400)
+    st.plotly_chart(fig_loss, use_container_width=True)
+
+with tab3:
+    st.subheader("Stress Envelopes at Service Stage")
+    fig_stress = make_subplots(rows=1, cols=2, subplot_titles=("Transfer Stage", "Service I Stage"))
+
+    fig_stress.add_trace(go.Scatter(x=R["x"], y=R["tr_top"], name="Top (Tr)", line=dict(color="red")), row=1, col=1)
+    fig_stress.add_trace(go.Scatter(x=R["x"], y=R["tr_bot"], name="Bot (Tr)", line=dict(color="blue")), row=1, col=1)
+    fig_stress.add_hline(y=R["lim_tr_c"], line_dash="dash", line_color="orange", row=1, col=1)
+    fig_stress.add_hline(y=R["lim_tr_t"], line_dash="dash", line_color="
+    fig_stress.add_hline(y=R["lim_tr_t"], line_dash="dash", line_color="green", row=1, col=1)
+
+    fig_stress.add_trace(go.Scatter(x=R["x"], y=R["sv1_top"], name="Top (Sv)", line=dict(color="red", dash="dash")), row=1, col=2)
+    fig_stress.add_trace(go.Scatter(x=R["x"], y=R["sv1_bot"], name="Bot (Sv)", line=dict(color="blue", dash="dash")), row=1, col=2)
+    fig_stress.add_hline(y=R["lim_sv_ct"], line_dash="dash", line_color="orange", row=1, col=2)
+    fig_stress.add_hline(y=R["lim_sv_t"], line_dash="dash", line_color="green", row=1, col=2)
+
+    fig_stress.update_xaxes(title_text="x (m)", row=1, col=1)
+    fig_stress.update_xaxes(title_text="x (m)", row=1, col=2)
+    fig_stress.update_yaxes(title_text="Stress (MPa)", row=1, col=1)
+    fig_stress.update_yaxes(title_text="Stress (MPa)", row=1, col=2)
+    fig_stress.update_layout(height=500, showlegend=True)
+    st.plotly_chart(fig_stress, use_container_width=True)
+
+    st.caption("**Limits:** Transfer Comp = −0.60f'ci, Tens = +0.62√f'ci | Service Comp = −0.60f'c, Tens = +0.50√f'c")
+
+with tab4:
+    st.subheader("Flexural Capacity Check (Strength I)")
+    fig_flex = go.Figure()
+    fig_flex.add_trace(go.Scatter(x=R["x"], y=R["mu"], name="M_u (Demand)", line=dict(color="red", width=2)))
+    fig_flex.add_trace(go.Scatter(x=R["x"], y=R["phi_Mn_pos"], name="φM_n (Pos)", line=dict(color="green", dash="dash")))
+    fig_flex.add_trace(go.Scatter(x=R["x"], y=R["phi_Mn_neg"], name="φM_n (Neg)", line=dict(color="green", dash="dot")))
+    fig_flex.add_hline(y=0, line_color="black", line_width=0.5)
+    fig_flex.update_layout(
+        title="Flexural Demand vs Capacity",
+        xaxis_title="x (m)", yaxis_title="Moment (kNm/m)",
+        height=500, plot_bgcolor="white"
+    )
+    st.plotly_chart(fig_flex, use_container_width=True)
+
+    st.subheader("Ductility Check (c/d_p ≤ 0.42)")
+    cdp_max = max(np.nanmax(R["cdp_pos"]), np.nanmax(R["cdp_neg"]))
+    if cdp_max <= 0.42:
+        st.success(f"✅ Ductile section: c/d_p,max = {cdp_max:.3f} ≤ 0.42")
+    else:
+        st.error(f"❌ Over-reinforced: c/d_p,max = {cdp_max:.3f} > 0.42 — Add compression steel or increase depth")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("φM_n,max (Sagging)", f"{np.max(R['phi_Mn_pos']):.1f} kNm/m")
+        st.metric("M_u,max", f"{np.max(np.abs(R['mu'])):.1f} kNm/m")
+    with col2:
+        st.metric("φM_n,max (Hogging)", f"{np.min(R['phi_Mn_neg']):.1f} kNm/m")
+        st.metric("DCR_max", f"{np.max(np.abs(R['mu'])) / np.max(np.abs(R['phi_Mn_pos'])):.3f}")
+
+with tab5:
+    st.subheader("Shear Capacity Check (Strength I)")
+    fig_shear = go.Figure()
+    fig_shear.add_trace(go.Scatter(x=R["x"], y=R["vu"], name="V_u (Demand)", line=dict(color="red", width=2)))
+    fig_shear.add_trace(go.Scatter(x=R["x"], y=R["phi_Vn"], name="φV_n (Capacity)", line=dict(color="green", dash="dash")))
+    fig_shear.update_layout(
+        title="Shear Demand vs Capacity",
+        xaxis_title="x (m)", yaxis_title="Shear (kN/m)",
+        height=500, plot_bgcolor="white"
+    )
+    st.plotly_chart(fig_shear, use_container_width=True)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("φV_n,min", f"{np.min(R['phi_Vn']):.1f} kN/m")
+        st.metric("V_u,max", f"{np.max(R['vu']):.1f} kN/m")
+    with col2:
+        dcr_v_max = np.max(R["vu"] / R["phi_Vn"])
+        if dcr_v_max <= 1.0:
+            st.success(f"✅ Shear OK: DCR_max = {dcr_v_max:.3f} ≤ 1.0")
+        else:
+            st.error(f"❌ Shear FAIL: DCR_max = {dcr_v_max:.3f} > 1.0 — Add stirrups or increase depth")
+        st.metric("V_c (Concrete)", f"{np.mean(R['Vc']):.1f} kN/m")
+
+with tab6:
+    st.subheader("Station-by-Station Results Table")
+    summary_rows = []
+    for i in sta_idx:
+        mui_ = float(R["mu"][i]); vui_ = float(R["vu"][i])
+        cap = (float(R["phi_Mn_pos"][i]) if mui_>=0 else abs(float(R["phi_Mn_neg"][i])))
+        pVi_ = float(R["phi_Vn"][i])
+        ok_tr = (R["lim_tr_c"]<=R["tr_top"][i]<=R["lim_tr_t"] and
+                 R["lim_tr_c"]<=R["tr_bot"][i]<=R["lim_tr_t"])
+        ok_sv = (R["sv1_top"][i] >= R["lim_sv_ct"] and
+                 R["sv1_bot"][i] >= R["lim_sv_ct"] and
+                 R["sv1_top"][i] <= R["lim_sv_t"] and
+                 R["sv1_bot"][i] <= R["lim_sv_t"])
+        dcr_m = abs(mui_)/cap if cap >0 else 999
+        dcr_v = vui_/pVi_ if pVi_>0 else 999
+        summary_rows.append({
+            "x (m)": f"{R['x'][i]:.2f}",
+            "t (mm)": f"{R['t'][i]*1000:.0f}",
+            "z (mm)": f"{R['z'][i]*1000:.0f}",
+            "M_u (kNm/m)": f"{mui_:.1f}",
+            "φM_n (kNm/m)": f"{cap:.1f}",
+            "DCR_Flex": f"{dcr_m:.3f}",
+            "Flexure": "✅" if abs(mui_)<=cap else "❌",
+            "V_u (kN/m)": f"{vui_:.1f}",
+            "φV_n (kN/m)": f"{pVi_:.1f}",
+            "DCR_Shear": f"{dcr_v:.3f}",
+            "Shear": "✅" if vui_<=pVi_ else "❌",
+            "Transfer": "✅" if ok_tr else "❌",
+            "Service": "✅" if ok_sv else "❌",
+        })
+    df_summary = pd.DataFrame(summary_rows)
+    st.dataframe(df_summary, use_container_width=True, hide_index=True)
+
+    st.download_button(
+        label="📥 Download Station Results (CSV)",
+        data=df_summary.to_csv(index=False).encode("utf-8"),
+        file_name=f"{doc_no}_station_results.csv",
+        mime="text/csv"
+    )
+
+with tab7:
+    st.subheader("📄 Download Calculation Report")
+    st.markdown("""
+    รายงาน Word ประกอบด้วย:
+    1. **Cover Page** - ข้อมูลโครงการ
+    2. **Design Basis** - สมมติฐานการออกแบบ AASHTO LRFD
+    3. **Input Summary** - Material, Prestressing, Geometry + **รูป Section**
+    4. **Prestress Loss** - การคำนวณ Loss ทั้ง Immediate และ Long-term
+    5. **Stress Diagrams** - **รูป Transfer Stress** + **รูป Service Stress**
+    6. **Station-by-Station** - ผลการตรวจสอบทุก Station แบบละเอียด
+    7. **Summary Table** - ตารางสรุป DCR และ Pass/Fail
+    """)
+
+    report_buf = make_report()
+    st.download_button(
+        label="📥 Download Report (Word.docx)",
+        data=report_buf,
+        file_name=f"{doc_no}_Tendon_Design_Report.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        use_container_width=True
+    )
+
+    st.info("💡 **Tip:** เปิดไฟล์ใน Microsoft Word เพื่อดูรูป Section และ Stress Diagrams ที่แทรกอัตโนมัติ")
+
+    st.markdown("---")
+    st.subheader("Overall Design Status")
+    all_ok = all(
+        (R["lim_tr_c"]<=R["tr_top"][i]<=R["lim_tr_t"] and
+         R["lim_tr_c"]<=R["tr_bot"][i]<=R["lim_tr_t"] and
+         R["sv1_top"][i] >= R["lim_sv_ct"] and R["sv1_bot"][i] >= R["lim_sv_ct"] and
+         R["sv1_top"][i] <= R["lim_sv_t"] and R["sv1_bot"][i] <= R["lim_sv_t"] and
+         abs(R["mu"][i]) <= (R["phi_Mn_pos"][i] if R["mu"][i]>=0 else abs(R["phi_Mn_neg"][i])) and
+         R["vu"][i] <= R["phi_Vn"][i])
+        for i in sta_idx
+    )
+    if all_ok:
+        st.success("🎉 **OVERALL: ADEQUATE** — The top flange tendon design satisfies all AASHTO LRFD limit states checked.")
+    else:
+        st.error("⚠️ **OVERALL: NOT ADEQUATE** — Revise tendon layout, spacing, strand count, or section geometry.")
+
+except Exception as e:
+    st.error(f"Calculation Error: {e}")
+    st.exception(e)
