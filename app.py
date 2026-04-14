@@ -26,7 +26,326 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 # ─────────────────────────────────────────────────────────────────────────────
 # 1.  CONFIG & SESSION STATE INITIALIZATION
 # ─────────────────────────────────────────────────────────────────────────────
-st.set_page_config(layout="wide", page_title="PSC Box Girder — Top Flange Design")
+st.set_page_config(layout="wide", page_title="PSC Box Girder — Top Flange Design",
+                   page_icon="🏗️")
+
+# ─── Professional UI CSS ──────────────────────────────────────────────────────
+st.markdown("""
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ── Root variables ── */
+:root {
+  --navy:      #162032;
+  --navy2:     #1e2d42;
+  --navy3:     #243450;
+  --accent:    #3b9fe8;
+  --accent2:   #26d07c;
+  --accent3:   #f59e0b;
+  --danger:    #ef4444;
+  --text:      #1e293b;
+  --text-muted:#64748b;
+  --border:    #e2e8f0;
+  --card-bg:   #ffffff;
+  --page-bg:   #f1f5f9;
+  --font:      'DM Sans', sans-serif;
+  --mono:      'JetBrains Mono', monospace;
+}
+
+/* ── Global font override ── */
+html, body, [class*="css"] { font-family: var(--font) !important; }
+
+/* ── Page background ── */
+.stApp { background: var(--page-bg) !important; }
+.block-container { padding: 1.5rem 2rem 2rem 2rem !important; max-width: 1600px !important; }
+
+/* ════════════════════════════════════════════════════
+   SIDEBAR
+═══════════════════════════════════════════════════ */
+[data-testid="stSidebar"] {
+  background: var(--navy) !important;
+  border-right: 1px solid var(--navy3) !important;
+}
+[data-testid="stSidebar"] * { color: #c9d8ec !important; }
+[data-testid="stSidebar"] h1,
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] h3,
+[data-testid="stSidebar"] .stSubheader { color: #ffffff !important; }
+[data-testid="stSidebar"] label,
+[data-testid="stSidebar"] .stCaption  { color: #94a3b8 !important; }
+
+/* Sidebar inputs */
+[data-testid="stSidebar"] input,
+[data-testid="stSidebar"] .stSelectbox > div > div,
+[data-testid="stSidebar"] .stSlider    { 
+  background: var(--navy2) !important;
+  color: #e2eaf5 !important;
+  border: 1px solid var(--navy3) !important;
+  border-radius: 6px !important;
+}
+[data-testid="stSidebar"] .stNumberInput input { color: #e2eaf5 !important; }
+[data-testid="stSidebar"] .stTextInput  input  { 
+  background: var(--navy2) !important; 
+  color: #e2eaf5 !important; 
+  border: 1px solid var(--navy3) !important; 
+}
+
+/* Sidebar expander */
+[data-testid="stSidebar"] [data-testid="stExpander"] {
+  background: var(--navy2) !important;
+  border: 1px solid var(--navy3) !important;
+  border-radius: 8px !important;
+  margin-bottom: 0.6rem !important;
+}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary {
+  color: #a8c4e0 !important;
+  font-weight: 600 !important;
+  font-size: 0.82rem !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+}
+
+/* Sidebar download/upload buttons */
+[data-testid="stSidebar"] .stDownloadButton > button,
+[data-testid="stSidebar"] .stButton > button {
+  background: linear-gradient(135deg, var(--accent) 0%, #2a82d0 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 7px !important;
+  font-weight: 600 !important;
+  font-size: 0.83rem !important;
+  padding: 0.55rem 1rem !important;
+  transition: all 0.2s ease !important;
+  box-shadow: 0 2px 8px rgba(59,159,232,0.30) !important;
+}
+[data-testid="stSidebar"] .stDownloadButton > button:hover,
+[data-testid="stSidebar"] .stButton > button:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 14px rgba(59,159,232,0.45) !important;
+}
+/* Report download button — green accent */
+[data-testid="stSidebar"] .stDownloadButton:last-of-type > button {
+  background: linear-gradient(135deg, var(--accent2) 0%, #1aad65 100%) !important;
+  box-shadow: 0 2px 8px rgba(38,208,124,0.30) !important;
+}
+
+/* Sidebar dividers */
+[data-testid="stSidebar"] hr { border-color: var(--navy3) !important; opacity:0.6; }
+[data-testid="stSidebar"] .stInfo  { background: rgba(59,159,232,0.12) !important; border-left: 3px solid var(--accent) !important; border-radius: 6px !important; }
+
+/* ════════════════════════════════════════════════════
+   MAIN CONTENT
+═══════════════════════════════════════════════════ */
+
+/* Section card wrapper (data editors) */
+.section-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.4rem 1.6rem;
+  margin-bottom: 1.2rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+/* Page header banner */
+.page-header {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy2) 60%, #1d3a5f 100%);
+  border-radius: 14px;
+  padding: 1.6rem 2.2rem;
+  margin-bottom: 1.6rem;
+  box-shadow: 0 4px 20px rgba(22,32,50,0.22);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+.page-header-title {
+  color: #ffffff;
+  font-size: 1.55rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0;
+  line-height: 1.2;
+}
+.page-header-subtitle {
+  color: #94b8d6;
+  font-size: 0.82rem;
+  font-weight: 400;
+  margin-top: 0.25rem;
+  font-family: var(--mono) !important;
+}
+.header-badge {
+  background: rgba(59,159,232,0.18);
+  border: 1px solid rgba(59,159,232,0.35);
+  color: #7ec8f7;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.3rem 0.75rem;
+  border-radius: 20px;
+  letter-spacing: 0.05em;
+}
+
+/* Section heading labels */
+.section-label {
+  font-size: 0.70rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 0.3rem;
+}
+.section-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 1rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 2px solid var(--border);
+}
+
+/* ── Metrics / KPI cards ── */
+[data-testid="stMetric"] {
+  background: var(--card-bg) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 10px !important;
+  padding: 1rem 1.2rem !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06) !important;
+  transition: box-shadow 0.2s ease !important;
+}
+[data-testid="stMetric"]:hover {
+  box-shadow: 0 4px 14px rgba(0,0,0,0.10) !important;
+}
+[data-testid="stMetricLabel"] {
+  color: var(--text-muted) !important;
+  font-size: 0.76rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+}
+[data-testid="stMetricValue"] {
+  color: var(--text) !important;
+  font-size: 1.45rem !important;
+  font-weight: 700 !important;
+  font-family: var(--mono) !important;
+}
+[data-testid="stMetricDelta"] {
+  font-size: 0.78rem !important;
+  font-weight: 500 !important;
+}
+
+/* ── Tabs ── */
+[data-testid="stTabs"] [role="tablist"] {
+  background: var(--card-bg) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 10px !important;
+  padding: 4px !important;
+  gap: 2px !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05) !important;
+  margin-bottom: 1rem !important;
+}
+[data-testid="stTabs"] [role="tab"] {
+  background: transparent !important;
+  border-radius: 8px !important;
+  color: var(--text-muted) !important;
+  font-weight: 600 !important;
+  font-size: 0.82rem !important;
+  padding: 0.45rem 0.9rem !important;
+  border: none !important;
+  transition: all 0.18s ease !important;
+}
+[data-testid="stTabs"] [role="tab"]:hover {
+  background: var(--page-bg) !important;
+  color: var(--text) !important;
+}
+[data-testid="stTabs"] [role="tab"][aria-selected="true"] {
+  background: var(--navy) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(22,32,50,0.25) !important;
+}
+
+/* ── Dataframes / Tables ── */
+[data-testid="stDataFrame"] {
+  border-radius: 10px !important;
+  overflow: hidden !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+}
+[data-testid="stDataFrame"] thead th {
+  background: var(--navy) !important;
+  color: #c9d8ec !important;
+  font-size: 0.77rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+}
+[data-testid="stDataFrame"] tbody tr:nth-child(even) td { background: #f8fafc !important; }
+[data-testid="stDataFrame"] tbody tr:hover td { background: #eff6ff !important; }
+
+/* ── Data editor ── */
+[data-testid="stDataEditor"] {
+  border-radius: 10px !important;
+  overflow: hidden !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05) !important;
+}
+
+/* ── Subheaders / Headings in main area ── */
+.stSubheader h3,
+h3 {
+  color: var(--text) !important;
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+  padding: 0.5rem 0 0.3rem 0 !important;
+  border-bottom: 2px solid var(--border) !important;
+  margin-bottom: 0.8rem !important;
+}
+h1 { 
+  color: var(--text) !important; 
+  font-weight: 800 !important;
+}
+
+/* ── Alert boxes ── */
+[data-testid="stAlert"] {
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+  font-size: 0.9rem !important;
+}
+.stSuccess { 
+  background: linear-gradient(135deg,#dcfce7 0%,#d1fae5 100%) !important; 
+  border-left: 4px solid var(--accent2) !important; 
+  border-radius: 8px !important;
+}
+.stError { 
+  background: linear-gradient(135deg,#fee2e2 0%,#fecaca 100%) !important; 
+  border-left: 4px solid var(--danger) !important; 
+  border-radius: 8px !important;
+}
+.stWarning { 
+  background: linear-gradient(135deg,#fef9c3 0%,#fef08a 100%) !important; 
+  border-left: 4px solid var(--accent3) !important; 
+  border-radius: 8px !important;
+}
+.stInfo { 
+  background: linear-gradient(135deg,#dbeafe 0%,#bfdbfe 100%) !important; 
+  border-left: 4px solid var(--accent) !important; 
+  border-radius: 8px !important;
+}
+
+/* ── Plotly charts ── */
+.js-plotly-plot {
+  border-radius: 10px !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06) !important;
+  overflow: hidden !important;
+}
+
+/* ── Dividers ── */
+hr { border-color: var(--border) !important; opacity: 0.8 !important; }
+
+/* ── Streamlit's default title (hide) ── */
+.stTitle { display: none !important; }
+</style>
+""", unsafe_allow_html=True)
 
 DEFAULT_SCALARS = dict(
     width=12.0, cl_lweb=2.0, cl_rweb=10.0,
@@ -223,25 +542,43 @@ with st.sidebar:
 # ─────────────────────────────────────────────────────────────────────────────
 # 3.  DATA EDITORS
 # ─────────────────────────────────────────────────────────────────────────────
-st.title("🏗️  PSC Box Girder — Top Flange Transverse Design")
-st.caption("AASHTO LRFD  |  1.0 m transverse strip  |  "
-           "Compression (−)  Tension (+)  |  +M = sagging")
+st.markdown("""
+<div class="page-header">
+  <div>
+    <div class="page-header-title">🏗️ PSC Box Girder — Top Flange Transverse Design</div>
+    <div class="page-header-subtitle">AASHTO LRFD &nbsp;|&nbsp; 1.0 m Transverse Strip &nbsp;|&nbsp; Compression (−) &nbsp; Tension (+) &nbsp;|&nbsp; +M = sagging</div>
+  </div>
+  <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+    <span class="header-badge">AASHTO LRFD</span>
+    <span class="header-badge">PSC Design</span>
+    <span class="header-badge">v3 Fixed</span>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<div class="section-label">Input Data</div>
+<div class="section-title">📐 Geometry &amp; Loading Tables</div>
+""", unsafe_allow_html=True)
 
 # Versioned keys: change on file load → widgets reinit from updated src
 _v = st.session_state["_tbl_ver"]
 
 c1, c2 = st.columns(2)
 with c1:
+    st.markdown('<div class="section-label">Section Profile</div>', unsafe_allow_html=True)
     st.subheader("📏 Flange Thickness t(x)")
     df_thk = st.data_editor(
         st.session_state["thk_src"], num_rows="dynamic", key=f"ed_thk_{_v}")
     st.session_state["_cur_thk"] = df_thk   # plain DataFrame for Save
 
+    st.markdown('<div class="section-label">Prestress Layout</div>', unsafe_allow_html=True)
     st.subheader("🔩 Tendon Profile z(x)  [from top face]")
     df_tdn = st.data_editor(
         st.session_state["tdn_src"], num_rows="dynamic", key=f"ed_tdn_{_v}")
     st.session_state["_cur_tdn"] = df_tdn
 with c2:
+    st.markdown('<div class="section-label">Applied Forces</div>', unsafe_allow_html=True)
     st.subheader("📦 Loads per 1 m strip")
     df_ld = st.data_editor(
         st.session_state["ld_src"], num_rows="dynamic", key=f"ed_ld_{_v}")
@@ -575,6 +912,37 @@ def run_calc(dft, dfp, dfl, L):
         lim_sv_cp=lim_sv_cp, lim_sv_ct=lim_sv_ct, lim_sv_t=lim_sv_t,
     )
 
+# ── Consistent chart styling helper ──────────────────────────────────────────
+_CHART_LAYOUT = dict(
+    plot_bgcolor="#ffffff",
+    paper_bgcolor="#ffffff",
+    font=dict(family="DM Sans, sans-serif", size=12, color="#1e293b"),
+    xaxis=dict(
+        showgrid=True, gridcolor="#e2e8f0", gridwidth=1,
+        linecolor="#cbd5e1", linewidth=1,
+        tickfont=dict(size=11),
+    ),
+    yaxis=dict(
+        showgrid=True, gridcolor="#e2e8f0", gridwidth=1,
+        linecolor="#cbd5e1", linewidth=1,
+        tickfont=dict(size=11),
+    ),
+    legend=dict(
+        bgcolor="rgba(255,255,255,0.9)",
+        bordercolor="#e2e8f0", borderwidth=1,
+        font=dict(size=11),
+    ),
+    margin=dict(t=48, b=56, l=56, r=20),
+    hoverlabel=dict(bgcolor="white", bordercolor="#cbd5e1", font_size=12),
+)
+
+def apply_chart_theme(fig, title="", height=400, **kwargs):
+    layout = dict(_CHART_LAYOUT)
+    layout.update(height=height, title=dict(text=title, font=dict(size=14, color="#162032", family="DM Sans, sans-serif"), x=0.02))
+    layout.update(**kwargs)
+    fig.update_layout(**layout)
+    return fig
+
 try:
     dft = prep(df_thk); dfp = prep(df_tdn); dfl = prep(df_ld)
     if any(len(d) < 2 for d in [dft, dfp, dfl]):
@@ -594,6 +962,22 @@ try:
     sta_x   = dfl["x (m)"].values
     sta_idx = [int(np.abs(R["x"] - v).argmin()) for v in sta_x]
     N       = len(R["x"])
+
+    # ── KPI Overview Cards ──────────────────────────────────────────────────
+    st.markdown("""
+    <div style="margin: 1.5rem 0 0.5rem 0;">
+      <div class="section-label">Quick Overview</div>
+    </div>
+    """, unsafe_allow_html=True)
+    _kL = R["L"]
+    kc1,kc2,kc3,kc4,kc5,kc6 = st.columns(6)
+    kc1.metric("f'c",           f"{fc:.0f} MPa",       help="Concrete strength at service")
+    kc2.metric("fpu",           f"{fpu:.0f} MPa",      help="Strand tensile strength")
+    kc3.metric("Aps (1m strip)",f"{_kL['Aps']*1e6:.0f} mm²", help="Total PS steel area")
+    kc4.metric("Pi",            f"{_kL['Pi']:.1f} kN/m", help="Initial prestress force")
+    kc5.metric("Pe",            f"{_kL['Pe']:.1f} kN/m", help="Effective prestress force")
+    kc6.metric("Total Loss",    f"{_kL['total_loss_pct']:.1f}%",
+               delta=f"fpe = {_kL['fpe']:.0f} MPa", help="Total prestress loss")
 
     # ─────────────────────────────────────────────────────────────────
     # 5.  REPORT GENERATOR   (called only on button press)
@@ -1322,6 +1706,13 @@ try:
             return "background-color:#ffc7ce;color:#9c0006"
         return df_in.style.map(_s, subset=[col])
 
+    st.markdown("""
+    <div style="margin-top:1.5rem;">
+      <div class="section-label">Analysis Results</div>
+      <div class="section-title">📊 Design Checks &amp; Envelopes</div>
+    </div>
+    """, unsafe_allow_html=True)
+
     tabs = st.tabs([
         "📐 Geometry",
         "📉 Prestress Losses",
@@ -1418,21 +1809,24 @@ try:
         # No station x-labels (removed as requested)
 
         fig.update_layout(
-            title="Top Flange Cross-Section with Tendon Layout",
             height=420,
             xaxis=dict(
                 title="Distance from Left Edge (m)",
                 range=[-width*0.04, width*1.04],
-                showgrid=True, gridcolor="rgba(200,200,200,0.4)",
+                showgrid=True, gridcolor="#e2e8f0",
             ),
             yaxis=dict(
                 title="Depth (mm)",
                 range=y_range,
-                showgrid=True, gridcolor="rgba(200,200,200,0.4)"
+                showgrid=True, gridcolor="#e2e8f0",
             ),
-            legend=dict(orientation="h", y=-0.18),
-            plot_bgcolor="white",
-            margin=dict(t=50, b=80),
+            legend=dict(orientation="h", y=-0.18, bgcolor="rgba(255,255,255,0.9)", bordercolor="#e2e8f0", borderwidth=1),
+            plot_bgcolor="#ffffff",
+            paper_bgcolor="#ffffff",
+            font=dict(family="DM Sans, sans-serif", size=12, color="#1e293b"),
+            title=dict(text="Top Flange Cross-Section with Tendon Layout", font=dict(size=14, color="#162032"), x=0.02),
+            margin=dict(t=50, b=80, l=56, r=20),
+            hoverlabel=dict(bgcolor="white", bordercolor="#cbd5e1", font_size=12),
         )
 
         st.plotly_chart(fig, use_container_width=True)
@@ -1599,7 +1993,7 @@ try:
                        annotation_text=f"−0.60f'ci = {R['lim_tr_c']:.2f} MPa")
         fig2.add_hline(y=R["lim_tr_t"], line_dash="dash", line_color="green",
                        annotation_text=f"+0.62√f'ci = +{R['lim_tr_t']:.3f} MPa")
-        fig2.update_layout(height=380, xaxis_title="x (m)", yaxis_title="Stress (MPa)")
+        apply_chart_theme(fig2, height=400, xaxis_title="x (m)", yaxis_title="Stress (MPa)")
         st.plotly_chart(fig2, use_container_width=True)
         rows_tr = [{"x (m)": f"{R['x'][i]:.2f}",
                     "σ_top (MPa)": f"{R['tr_top'][i]:.4f}",
@@ -1621,7 +2015,7 @@ try:
                        annotation_text=f"−0.45f'c = {R['lim_sv_cp']:.2f} MPa")
         fig3.add_hline(y=R["lim_sv_t"],  line_dash="dash", line_color="green",
                        annotation_text=f"+0.50√f'c = +{R['lim_sv_t']:.3f} MPa")
-        fig3.update_layout(height=380, xaxis_title="x (m)", yaxis_title="Stress (MPa)")
+        apply_chart_theme(fig3, height=400, xaxis_title="x (m)", yaxis_title="Stress (MPa)")
         st.plotly_chart(fig3, use_container_width=True)
         rows_sv = [{"x (m)":       f"{R['x'][i]:.2f}",
                     "σ_top (MPa)": f"{R['sv1_top'][i]:.4f}",
@@ -1644,7 +2038,7 @@ try:
                                    line=dict(color="darkgreen", dash="dash", width=2)))
         fig4.add_trace(go.Scatter(x=R["x"], y=R["mu"], name="Mu",
                                    fill="tozeroy", line_color="rgba(220,50,50,0.8)"))
-        fig4.update_layout(height=380, xaxis_title="x (m)", yaxis_title="Moment (kNm/m)")
+        apply_chart_theme(fig4, height=400, xaxis_title="x (m)", yaxis_title="Moment (kNm/m)")
         st.plotly_chart(fig4, use_container_width=True)
         rows_flx = []
         for i in sta_idx:
@@ -1670,7 +2064,7 @@ try:
             go.Scatter(x=R["x"], y=R["vu"],     name="Vu  (factored)",
                        fill="tozeroy", line_color="rgba(0,100,220,0.8)"),
         ])
-        fig5.update_layout(height=380, xaxis_title="x (m)", yaxis_title="Shear (kN/m)")
+        apply_chart_theme(fig5, height=400, xaxis_title="x (m)", yaxis_title="Shear (kN/m)")
         st.plotly_chart(fig5, use_container_width=True)
         rows_shr = []
         for i in sta_idx:
