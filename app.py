@@ -28,6 +28,329 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 # ─────────────────────────────────────────────────────────────────────────────
 st.set_page_config(layout="wide", page_title="PSC Box Girder — Top Flange Design")
 
+# ─────────────────────────────────────────────────────────────────────────────
+# CUSTOM THEME — Modern Enterprise SaaS (Navy Blue / Slate Grey / IBM Plex)
+# ─────────────────────────────────────────────────────────────────────────────
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+/* ── Design tokens ────────────────────────────────────────────────── */
+:root {
+    --c-navy:       #0D1E3F;
+    --c-navy-mid:   #163062;
+    --c-accent:     #2558D4;
+    --c-accent-lt:  #3B7BFF;
+    --c-slate-700:  #334155;
+    --c-slate-500:  #64748B;
+    --c-slate-300:  #CBD5E1;
+    --c-border:     #DDE3EF;
+    --c-bg:         #F3F5FA;
+    --c-card:       #FFFFFF;
+    --c-text:       #1A2540;
+    --c-muted:      #6B7A99;
+    --c-success:    #0B6E4F;
+    --c-error:      #B91C1C;
+    --c-warn:       #92400E;
+    --shadow-sm:    0 1px 3px rgba(13,30,63,0.07), 0 1px 2px rgba(13,30,63,0.05);
+    --shadow-md:    0 4px 16px rgba(13,30,63,0.10), 0 2px 6px rgba(13,30,63,0.06);
+    --r-sm:         5px;
+    --r-md:         8px;
+    --r-lg:         12px;
+}
+
+/* ── Global font ─────────────────────────────────────────────────── */
+html, body, [class*="css"], .stMarkdown, p, div, span, td, th, label {
+    font-family: 'IBM Plex Sans', system-ui, -apple-system, sans-serif !important;
+}
+code, pre, .stCode, kbd {
+    font-family: 'IBM Plex Mono', 'Courier New', monospace !important;
+}
+
+/* ── Page background ─────────────────────────────────────────────── */
+.stApp { background-color: var(--c-bg) !important; }
+.main .block-container {
+    padding: 1.75rem 2.5rem 3rem !important;
+    max-width: 1480px !important;
+}
+
+/* ── Streamlit top toolbar ───────────────────────────────────────── */
+header[data-testid="stHeader"] {
+    background: var(--c-navy) !important;
+    border-bottom: none !important;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────────── */
+[data-testid="stSidebar"] {
+    background: linear-gradient(175deg, #0B1A38 0%, #122045 55%, #0F1E40 100%) !important;
+    border-right: 1px solid rgba(255,255,255,0.05) !important;
+}
+[data-testid="stSidebar"] section[data-testid="stSidebarContent"] {
+    padding: 1rem 1.1rem !important;
+}
+[data-testid="stSidebar"] * { color: rgba(210,225,255,0.85) !important; }
+[data-testid="stSidebar"] h1,
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] h3 {
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+    font-size: 0.95rem !important;
+}
+[data-testid="stSidebar"] hr {
+    border-color: rgba(255,255,255,0.10) !important;
+    margin: 0.75rem 0 !important;
+}
+[data-testid="stSidebar"] label {
+    font-size: 0.73rem !important;
+    font-weight: 600 !important;
+    color: rgba(170,195,255,0.70) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.06em !important;
+}
+[data-testid="stSidebar"] .stCaption,
+[data-testid="stSidebar"] small {
+    color: rgba(150,175,255,0.50) !important;
+    font-size: 0.71rem !important;
+}
+[data-testid="stSidebar"] input,
+[data-testid="stSidebar"] textarea {
+    background: rgba(255,255,255,0.07) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    color: rgba(220,235,255,0.95) !important;
+    border-radius: var(--r-sm) !important;
+    font-size: 0.85rem !important;
+}
+[data-testid="stSidebar"] input:focus,
+[data-testid="stSidebar"] textarea:focus {
+    border-color: rgba(100,160,255,0.6) !important;
+    box-shadow: 0 0 0 3px rgba(59,123,255,0.15) !important;
+}
+[data-testid="stSidebar"] .stSelectbox > div > div {
+    background: rgba(255,255,255,0.07) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    border-radius: var(--r-sm) !important;
+    color: rgba(220,235,255,0.95) !important;
+}
+[data-testid="stSidebar"] .streamlit-expanderHeader {
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid rgba(255,255,255,0.10) !important;
+    border-radius: var(--r-sm) !important;
+    color: rgba(220,235,255,0.92) !important;
+    font-size: 0.82rem !important;
+    font-weight: 600 !important;
+    padding: 0.65rem 0.9rem !important;
+    letter-spacing: 0.01em !important;
+}
+[data-testid="stSidebar"] .streamlit-expanderContent {
+    background: rgba(0,0,0,0.12) !important;
+    border: 1px solid rgba(255,255,255,0.07) !important;
+    border-top: none !important;
+    border-radius: 0 0 var(--r-sm) var(--r-sm) !important;
+    padding: 0.75rem !important;
+}
+[data-testid="stSidebar"] .stDownloadButton > button {
+    background: rgba(37,88,212,0.85) !important;
+    border: none !important; border-radius: var(--r-sm) !important;
+    color: white !important; font-weight: 600 !important; font-size: 0.82rem !important;
+    padding: 0.45rem 1rem !important; letter-spacing: 0.03em !important;
+    transition: all 0.15s ease !important;
+}
+[data-testid="stSidebar"] .stDownloadButton > button:hover {
+    background: var(--c-accent-lt) !important;
+    transform: translateY(-1px) !important;
+}
+[data-testid="stSidebar"] .stFileUploader > div {
+    background: rgba(255,255,255,0.05) !important;
+    border: 1.5px dashed rgba(100,140,255,0.35) !important;
+    border-radius: var(--r-md) !important;
+}
+
+/* ── Main area typography ────────────────────────────────────────── */
+h1 {
+    font-size: 1.7rem !important; font-weight: 700 !important;
+    color: var(--c-navy) !important; letter-spacing: -0.03em !important;
+    line-height: 1.2 !important; margin-bottom: 0.1rem !important;
+}
+h2 {
+    font-size: 1.1rem !important; font-weight: 600 !important;
+    color: var(--c-navy-mid) !important; letter-spacing: -0.01em !important;
+}
+h3 {
+    font-size: 0.93rem !important; font-weight: 600 !important;
+    color: var(--c-text) !important;
+}
+.stCaption p { color: var(--c-muted) !important; font-size: 0.77rem !important; }
+hr { border-color: var(--c-border) !important; margin: 1rem 0 !important; }
+
+/* ── Data input tables ───────────────────────────────────────────── */
+.stDataFrame,
+[data-testid="stDataFrame"],
+[data-testid="stDataEditor"] {
+    border: 1px solid var(--c-border) !important;
+    border-radius: var(--r-md) !important;
+    overflow: hidden !important;
+    box-shadow: var(--shadow-sm) !important;
+}
+
+/* ── Result tabs ─────────────────────────────────────────────────── */
+.stTabs [data-baseweb="tab-list"] {
+    background: var(--c-card) !important;
+    border-bottom: 2px solid var(--c-border) !important;
+    border-radius: var(--r-md) var(--r-md) 0 0 !important;
+    padding: 0 0.6rem !important;
+    box-shadow: var(--shadow-sm) !important;
+    gap: 0.05rem !important;
+}
+.stTabs [data-baseweb="tab"] {
+    font-size: 0.78rem !important; font-weight: 500 !important;
+    color: var(--c-slate-500) !important;
+    padding: 0.6rem 0.85rem !important;
+    border: none !important; border-bottom: 3px solid transparent !important;
+    background: transparent !important; margin-bottom: -2px !important;
+    letter-spacing: 0.015em !important;
+    transition: color 0.18s, background 0.18s !important;
+}
+.stTabs [data-baseweb="tab"]:hover {
+    color: var(--c-accent) !important;
+    background: rgba(37,88,212,0.04) !important;
+    border-radius: var(--r-sm) var(--r-sm) 0 0 !important;
+}
+.stTabs [aria-selected="true"] {
+    color: var(--c-accent) !important;
+    border-bottom-color: var(--c-accent) !important;
+    font-weight: 600 !important;
+}
+.stTabs [data-baseweb="tab-panel"] {
+    background: var(--c-card) !important;
+    border: 1px solid var(--c-border) !important; border-top: none !important;
+    border-radius: 0 0 var(--r-md) var(--r-md) !important;
+    padding: 1.5rem 1.75rem !important;
+    box-shadow: 0 2px 8px rgba(13,30,63,0.05) !important;
+}
+
+/* ── Metric cards ────────────────────────────────────────────────── */
+[data-testid="stMetric"] {
+    background: var(--c-card) !important;
+    border: 1px solid var(--c-border) !important;
+    border-top: 3px solid var(--c-accent) !important;
+    border-radius: var(--r-md) !important;
+    padding: 0.9rem 1.1rem !important;
+    box-shadow: var(--shadow-sm) !important;
+    transition: box-shadow 0.2s ease, transform 0.2s ease !important;
+}
+[data-testid="stMetric"]:hover {
+    box-shadow: var(--shadow-md) !important;
+    transform: translateY(-2px) !important;
+}
+[data-testid="stMetricLabel"] p {
+    font-size: 0.68rem !important; font-weight: 600 !important;
+    color: var(--c-muted) !important;
+    text-transform: uppercase !important; letter-spacing: 0.08em !important;
+}
+[data-testid="stMetricValue"] {
+    font-size: 1.3rem !important; font-weight: 700 !important;
+    color: var(--c-navy) !important;
+    font-variant-numeric: tabular-nums !important; letter-spacing: -0.02em !important;
+}
+[data-testid="stMetricDelta"] { font-size: 0.73rem !important; font-weight: 500 !important; }
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.stButton > button {
+    font-family: 'IBM Plex Sans', sans-serif !important;
+    font-weight: 600 !important; font-size: 0.83rem !important;
+    background: var(--c-accent) !important; color: white !important;
+    border: none !important; border-radius: var(--r-sm) !important;
+    padding: 0.45rem 1.2rem !important; letter-spacing: 0.03em !important;
+    box-shadow: 0 1px 3px rgba(37,88,212,0.35) !important;
+    transition: all 0.15s ease !important;
+}
+.stButton > button:hover {
+    background: var(--c-navy-mid) !important;
+    box-shadow: 0 4px 14px rgba(37,88,212,0.28) !important;
+    transform: translateY(-1px) !important;
+}
+.stDownloadButton > button {
+    font-family: 'IBM Plex Sans', sans-serif !important;
+    font-weight: 600 !important; font-size: 0.83rem !important;
+    background: var(--c-navy) !important; color: white !important;
+    border: none !important; border-radius: var(--r-sm) !important;
+    transition: all 0.15s ease !important;
+}
+.stDownloadButton > button:hover {
+    background: var(--c-navy-mid) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* ── Expanders (main area) ───────────────────────────────────────── */
+.streamlit-expanderHeader {
+    font-size: 0.85rem !important; font-weight: 600 !important;
+    background: var(--c-bg) !important; color: var(--c-navy-mid) !important;
+    border: 1px solid var(--c-border) !important;
+    border-radius: var(--r-sm) !important;
+    padding: 0.65rem 1rem !important; letter-spacing: 0.01em !important;
+}
+.streamlit-expanderContent {
+    background: var(--c-card) !important;
+    border: 1px solid var(--c-border) !important; border-top: none !important;
+    border-radius: 0 0 var(--r-sm) var(--r-sm) !important;
+    padding: 1rem 1.1rem !important;
+}
+
+/* ── Form inputs (main area) ─────────────────────────────────────── */
+.stNumberInput input,
+.stTextInput input {
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 0.875rem !important;
+    border: 1px solid var(--c-border) !important;
+    border-radius: var(--r-sm) !important;
+    background: var(--c-card) !important;
+    color: var(--c-text) !important;
+    transition: border-color 0.15s, box-shadow 0.15s !important;
+}
+.stNumberInput input:focus,
+.stTextInput input:focus {
+    border-color: var(--c-accent) !important;
+    box-shadow: 0 0 0 3px rgba(37,88,212,0.10) !important;
+    outline: none !important;
+}
+.stSelectbox > div > div {
+    border: 1px solid var(--c-border) !important;
+    border-radius: var(--r-sm) !important;
+    background: var(--c-card) !important;
+}
+label {
+    font-size: 0.82rem !important;
+    font-weight: 500 !important;
+    color: var(--c-text) !important;
+    letter-spacing: 0.01em !important;
+}
+
+/* ── Alert / notification boxes ─────────────────────────────────── */
+[data-testid="stAlert"] {
+    border-radius: var(--r-sm) !important;
+    border: none !important;
+    border-left: 4px solid !important;
+    font-size: 0.875rem !important;
+    font-weight: 400 !important;
+}
+.stSuccess { border-left-color: #059669 !important; background: rgba(5,150,105,0.08) !important; }
+.stError   { border-left-color: #DC2626 !important; background: rgba(220,38,38,0.07) !important; }
+.stWarning { border-left-color: #D97706 !important; background: rgba(217,119,6,0.07) !important; }
+.stInfo    { border-left-color: var(--c-accent) !important; background: rgba(37,88,212,0.06) !important; }
+
+/* ── Plotly chart containers ─────────────────────────────────────── */
+.js-plotly-plot .plotly, .plot-container {
+    border-radius: var(--r-md) !important;
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--c-bg); }
+::-webkit-scrollbar-thumb { background: var(--c-slate-300); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--c-slate-500); }
+</style>
+""", unsafe_allow_html=True)
+
 DEFAULT_SCALARS = dict(
     width=12.0, cl_lweb=2.0, cl_rweb=10.0,
     fc=45.0, fci=36.0, fpu=1860.0, fpy_ratio=0.90,
@@ -82,6 +405,23 @@ if "_loaded_hash" not in st.session_state:
 # 2.  SIDEBAR (Native State Binding)
 # ─────────────────────────────────────────────────────────────────────────────
 with st.sidebar:
+    # ── Sidebar brand header ──────────────────────────────────────────────
+    st.markdown("""
+    <div style="padding:1.0rem 0 0.9rem; border-bottom:1px solid rgba(255,255,255,0.10);
+                margin-bottom:0.65rem;">
+        <div style="font-size:0.60rem; font-weight:700; color:rgba(130,165,255,0.55);
+                    letter-spacing:0.20em; text-transform:uppercase; margin-bottom:0.25rem;">
+            STRUCTURAL ANALYSIS
+        </div>
+        <div style="font-size:1.10rem; font-weight:700; color:#FFFFFF; letter-spacing:-0.02em;">
+            PSC Design Suite
+        </div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:0.66rem;
+                    color:rgba(110,150,255,0.50); margin-top:0.15rem; letter-spacing:0.05em;">
+            AASHTO LRFD &nbsp;·&nbsp; v8.0
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 # ── 💾 SAVE / 📂 OPEN ────────────────────────────────────────────────────
     st.markdown("---")
     with st.expander("💾  Save  /  📂  Open Project", expanded=True):
@@ -223,9 +563,68 @@ with st.sidebar:
 # ─────────────────────────────────────────────────────────────────────────────
 # 3.  DATA EDITORS
 # ─────────────────────────────────────────────────────────────────────────────
-st.title("🏗️  PSC Box Girder — Top Flange Transverse Design")
-st.caption("AASHTO LRFD  |  1.0 m transverse strip  |  "
-           "Compression (−)  Tension (+)  |  +M = sagging")
+st.markdown("""
+<div style="
+    background: linear-gradient(135deg, #0D1E3F 0%, #163062 55%, #1A3A72 100%);
+    border-radius: 12px;
+    padding: 1.6rem 2.2rem 1.5rem;
+    margin-bottom: 1.6rem;
+    box-shadow: 0 4px 24px rgba(13,30,63,0.22), 0 1px 4px rgba(13,30,63,0.15);
+    border: 1px solid rgba(255,255,255,0.05);
+    position: relative; overflow: hidden;
+">
+    <div style="position:absolute; top:-40px; right:-40px; width:220px; height:220px;
+                border-radius:50%; background:rgba(37,88,212,0.12); pointer-events:none;"></div>
+    <div style="position:absolute; bottom:-60px; right:80px; width:160px; height:160px;
+                border-radius:50%; background:rgba(59,123,255,0.08); pointer-events:none;"></div>
+    <div style="display:flex; align-items:center; gap:1.2rem; position:relative;">
+        <div style="font-size:2.4rem; line-height:1; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3));">🏗️</div>
+        <div>
+            <div style="font-family:'IBM Plex Sans',sans-serif; font-size:1.45rem;
+                        font-weight:700; color:#FFFFFF; letter-spacing:-0.025em; line-height:1.2;">
+                PSC Box Girder — Top Flange Transverse Design
+            </div>
+            <div style="font-family:'IBM Plex Sans',sans-serif; font-size:0.80rem;
+                        color:rgba(170,200,255,0.70); margin-top:0.45rem;
+                        letter-spacing:0.04em; font-weight:400; line-height:1.5;">
+                AASHTO LRFD Bridge Design Specifications &nbsp;|&nbsp;
+                1.0 m Transverse Strip &nbsp;|&nbsp;
+                Compression (−) &nbsp;·&nbsp; Tension (+) &nbsp;·&nbsp; +M = Sagging
+            </div>
+        </div>
+        <div style="margin-left:auto; text-align:right; display:flex; flex-direction:column; gap:0.35rem;">
+            <div style="background:rgba(37,88,212,0.40); border:1px solid rgba(100,160,255,0.30);
+                        border-radius:6px; padding:0.3rem 0.85rem; display:inline-block;">
+                <span style="font-family:'IBM Plex Mono',monospace; font-size:0.68rem;
+                             color:rgba(180,210,255,0.90); letter-spacing:0.06em; font-weight:500;">
+                    AASHTO LRFD
+                </span>
+            </div>
+            <div style="background:rgba(5,150,105,0.25); border:1px solid rgba(52,211,153,0.30);
+                        border-radius:6px; padding:0.3rem 0.85rem; display:inline-block;">
+                <span style="font-family:'IBM Plex Mono',monospace; font-size:0.68rem;
+                             color:rgba(100,240,180,0.90); letter-spacing:0.06em; font-weight:500;">
+                    v3 FIXED ✓
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.9rem; margin-top:0.3rem;">
+    <div style="width:4px; height:24px; background:linear-gradient(180deg,#2558D4,#3B7BFF);
+                border-radius:2px; flex-shrink:0;"></div>
+    <span style="font-family:'IBM Plex Sans',sans-serif; font-size:1.0rem; font-weight:600;
+                 color:#163062; letter-spacing:-0.01em;">Input Data Tables</span>
+    <span style="font-size:0.73rem; color:#6B7A99; background:#F3F5FA;
+                 border:1px solid #DDE3EF; border-radius:4px; padding:0.15rem 0.55rem;
+                 font-family:'IBM Plex Mono',monospace; margin-left:0.5rem;">
+        per 1.0 m strip
+    </span>
+</div>
+""", unsafe_allow_html=True)
 
 # Versioned keys: change on file load → widgets reinit from updated src
 _v = st.session_state["_tbl_ver"]
@@ -1323,13 +1722,13 @@ try:
         return df_in.style.map(_s, subset=[col])
 
     tabs = st.tabs([
-        "📐 Geometry",
-        "📉 Prestress Losses",
-        "🚀 Transfer Stress",
-        "⚖️ Service Stress",
-        "💪 Flexure (Envelope)",
-        "🔪 Shear",
-        "📋 Summary",
+        "  ⬡  Geometry",
+        "  ↘  Prestress Losses",
+        "  ↯  Transfer Stress",
+        "  ⚖  Service Stress",
+        "  ⬆  Flexure Envelope",
+        "  ⌂  Shear",
+        "  ✦  Summary",
     ])
 
     with tabs[0]:
@@ -1418,21 +1817,31 @@ try:
         # No station x-labels (removed as requested)
 
         fig.update_layout(
-            title="Top Flange Cross-Section with Tendon Layout",
+            title=dict(text="Top Flange Cross-Section with Tendon Layout",
+                       font=dict(family="IBM Plex Sans", size=13, color="#163062"),
+                       x=0.01),
             height=420,
             xaxis=dict(
-                title="Distance from Left Edge (m)",
+                title=dict(text="Distance from Left Edge (m)",
+                           font=dict(family="IBM Plex Sans", size=11, color="#64748B")),
+                tickfont=dict(family="IBM Plex Mono", size=10, color="#64748B"),
                 range=[-width*0.04, width*1.04],
-                showgrid=True, gridcolor="rgba(200,200,200,0.4)",
+                showgrid=True, gridcolor="rgba(203,213,225,0.5)",
+                zeroline=False,
             ),
             yaxis=dict(
-                title="Depth (mm)",
+                title=dict(text="Depth (mm)",
+                           font=dict(family="IBM Plex Sans", size=11, color="#64748B")),
+                tickfont=dict(family="IBM Plex Mono", size=10, color="#64748B"),
                 range=y_range,
-                showgrid=True, gridcolor="rgba(200,200,200,0.4)"
+                showgrid=True, gridcolor="rgba(203,213,225,0.5)",
+                zeroline=False,
             ),
-            legend=dict(orientation="h", y=-0.18),
-            plot_bgcolor="white",
-            margin=dict(t=50, b=80),
+            legend=dict(orientation="h", y=-0.18,
+                        font=dict(family="IBM Plex Sans", size=11)),
+            plot_bgcolor="#FAFBFD",
+            paper_bgcolor="white",
+            margin=dict(t=50, b=80, l=60, r=20),
         )
 
         st.plotly_chart(fig, use_container_width=True)
@@ -1459,7 +1868,16 @@ try:
         col_c.metric("Pj (per 1m strip)",    f"{_L['Pj']:.2f} kN/m")
 
         st.markdown("---")
-        st.markdown("#### Immediate Losses")
+        st.markdown("""
+        <div style="display:flex;align-items:center;gap:0.6rem;margin:0.5rem 0 0.7rem;">
+            <div style="width:3px;height:18px;background:#2558D4;border-radius:2px;"></div>
+            <span style="font-size:0.88rem;font-weight:600;color:#163062;letter-spacing:-0.01em;">Immediate Losses</span>
+            <span style="font-size:0.72rem;color:#6B7A99;background:#F3F5FA;border:1px solid #DDE3EF;
+                         border-radius:4px;padding:0.1rem 0.5rem;font-family:'IBM Plex Mono',monospace;">
+                AASHTO 5.9.3.2
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
         _d = {
             "Loss Component": [
                 "1. Friction  ΔfpF  (at midspan)",
@@ -1499,7 +1917,16 @@ try:
         col_y.metric("Pi (per 1m strip)",        f"{_L['Pi']:.2f} kN/m")
 
         st.markdown("---")
-        st.markdown("#### Long-Term Losses  (Approximate Method)")
+        st.markdown("""
+        <div style="display:flex;align-items:center;gap:0.6rem;margin:0.5rem 0 0.7rem;">
+            <div style="width:3px;height:18px;background:#6B7A99;border-radius:2px;"></div>
+            <span style="font-size:0.88rem;font-weight:600;color:#163062;letter-spacing:-0.01em;">Long-Term Losses</span>
+            <span style="font-size:0.72rem;color:#6B7A99;background:#F3F5FA;border:1px solid #DDE3EF;
+                         border-radius:4px;padding:0.1rem 0.5rem;font-family:'IBM Plex Mono',monospace;">
+                AASHTO 5.9.3.3  ·  Approximate Method
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
         _d2 = {
             "Loss Component": [
                 "4. Shrinkage  ΔfpSH",
@@ -1546,7 +1973,12 @@ try:
                      delta=f"{_L['fpe']:.0f} MPa remaining")
 
         st.markdown("---")
-        st.markdown("#### Key Factors Used")
+        st.markdown("""
+        <div style="display:flex;align-items:center;gap:0.6rem;margin:0.5rem 0 0.7rem;">
+            <div style="width:3px;height:18px;background:#9CA3AF;border-radius:2px;"></div>
+            <span style="font-size:0.88rem;font-weight:600;color:#163062;letter-spacing:-0.01em;">Key Factors Used</span>
+        </div>
+        """, unsafe_allow_html=True)
         _factors = {
             "Parameter (description)": [
                 "Ec  (modulus of elasticity of concrete at service)",
@@ -1592,14 +2024,29 @@ try:
     with tabs[2]:
         st.subheader("Stress Check — Transfer  (Pi + M_DL  |  Net section)")
         fig2 = go.Figure([
-            go.Scatter(x=R["x"], y=R["tr_top"], name="Top",    line_color="red"),
-            go.Scatter(x=R["x"], y=R["tr_bot"], name="Bottom", line_color="blue"),
+            go.Scatter(x=R["x"], y=R["tr_top"], name="Top",
+                       line=dict(color="#E53E3E", width=2.2)),
+            go.Scatter(x=R["x"], y=R["tr_bot"], name="Bottom",
+                       line=dict(color="#2558D4", width=2.2)),
         ])
-        fig2.add_hline(y=R["lim_tr_c"], line_dash="dash", line_color="orange",
-                       annotation_text=f"−0.60f'ci = {R['lim_tr_c']:.2f} MPa")
-        fig2.add_hline(y=R["lim_tr_t"], line_dash="dash", line_color="green",
-                       annotation_text=f"+0.62√f'ci = +{R['lim_tr_t']:.3f} MPa")
-        fig2.update_layout(height=380, xaxis_title="x (m)", yaxis_title="Stress (MPa)")
+        fig2.add_hline(y=R["lim_tr_c"], line_dash="dash",
+                       line=dict(color="#DD6B20", width=1.5),
+                       annotation_text=f"−0.60f'ci = {R['lim_tr_c']:.2f} MPa",
+                       annotation_font=dict(size=10, color="#DD6B20"))
+        fig2.add_hline(y=R["lim_tr_t"], line_dash="dash",
+                       line=dict(color="#2F855A", width=1.5),
+                       annotation_text=f"+0.62√f'ci = +{R['lim_tr_t']:.3f} MPa",
+                       annotation_font=dict(size=10, color="#2F855A"))
+        fig2.update_layout(
+            height=380,
+            xaxis=dict(title="x (m)", gridcolor="rgba(203,213,225,0.5)",
+                       tickfont=dict(family="IBM Plex Mono", size=10)),
+            yaxis=dict(title="Stress (MPa)", gridcolor="rgba(203,213,225,0.5)",
+                       tickfont=dict(family="IBM Plex Mono", size=10)),
+            plot_bgcolor="#FAFBFD", paper_bgcolor="white",
+            legend=dict(font=dict(family="IBM Plex Sans", size=11)),
+            margin=dict(t=20, b=40, l=60, r=20),
+        )
         st.plotly_chart(fig2, use_container_width=True)
         rows_tr = [{"x (m)": f"{R['x'][i]:.2f}",
                     "σ_top (MPa)": f"{R['tr_top'][i]:.4f}",
@@ -1612,16 +2059,33 @@ try:
     with tabs[3]:
         st.subheader("Stress Check — Service I  (Pe + Ms1  |  Gross section)")
         fig3 = go.Figure([
-            go.Scatter(x=R["x"], y=R["sv1_top"], name="Top",    line_color="red"),
-            go.Scatter(x=R["x"], y=R["sv1_bot"], name="Bottom", line_color="blue"),
+            go.Scatter(x=R["x"], y=R["sv1_top"], name="Top",
+                       line=dict(color="#E53E3E", width=2.2)),
+            go.Scatter(x=R["x"], y=R["sv1_bot"], name="Bottom",
+                       line=dict(color="#2558D4", width=2.2)),
         ])
-        fig3.add_hline(y=R["lim_sv_ct"], line_dash="dash", line_color="orange",
-                       annotation_text=f"−0.60f'c = {R['lim_sv_ct']:.2f} MPa")
-        fig3.add_hline(y=R["lim_sv_cp"], line_dash="dot", line_color="goldenrod",
-                       annotation_text=f"−0.45f'c = {R['lim_sv_cp']:.2f} MPa")
-        fig3.add_hline(y=R["lim_sv_t"],  line_dash="dash", line_color="green",
-                       annotation_text=f"+0.50√f'c = +{R['lim_sv_t']:.3f} MPa")
-        fig3.update_layout(height=380, xaxis_title="x (m)", yaxis_title="Stress (MPa)")
+        fig3.add_hline(y=R["lim_sv_ct"], line_dash="dash",
+                       line=dict(color="#DD6B20", width=1.5),
+                       annotation_text=f"−0.60f'c = {R['lim_sv_ct']:.2f} MPa",
+                       annotation_font=dict(size=10, color="#DD6B20"))
+        fig3.add_hline(y=R["lim_sv_cp"], line_dash="dot",
+                       line=dict(color="#B7791F", width=1.2),
+                       annotation_text=f"−0.45f'c = {R['lim_sv_cp']:.2f} MPa",
+                       annotation_font=dict(size=10, color="#B7791F"))
+        fig3.add_hline(y=R["lim_sv_t"],  line_dash="dash",
+                       line=dict(color="#2F855A", width=1.5),
+                       annotation_text=f"+0.50√f'c = +{R['lim_sv_t']:.3f} MPa",
+                       annotation_font=dict(size=10, color="#2F855A"))
+        fig3.update_layout(
+            height=380,
+            xaxis=dict(title="x (m)", gridcolor="rgba(203,213,225,0.5)",
+                       tickfont=dict(family="IBM Plex Mono", size=10)),
+            yaxis=dict(title="Stress (MPa)", gridcolor="rgba(203,213,225,0.5)",
+                       tickfont=dict(family="IBM Plex Mono", size=10)),
+            plot_bgcolor="#FAFBFD", paper_bgcolor="white",
+            legend=dict(font=dict(family="IBM Plex Sans", size=11)),
+            margin=dict(t=20, b=40, l=60, r=20),
+        )
         st.plotly_chart(fig3, use_container_width=True)
         rows_sv = [{"x (m)":       f"{R['x'][i]:.2f}",
                     "σ_top (MPa)": f"{R['sv1_top'][i]:.4f}",
@@ -1639,12 +2103,23 @@ try:
         st.subheader("Flexural Strength Envelope  —  Strength I")
         fig4 = go.Figure()
         fig4.add_trace(go.Scatter(x=R["x"], y=R["phi_Mn_pos"], name="+φMn",
-                                   line=dict(color="green", dash="dash", width=2)))
+                                   line=dict(color="#2F855A", dash="dash", width=2.2)))
         fig4.add_trace(go.Scatter(x=R["x"], y=R["phi_Mn_neg"], name="−φMn",
-                                   line=dict(color="darkgreen", dash="dash", width=2)))
+                                   line=dict(color="#276749", dash="dash", width=2.2)))
         fig4.add_trace(go.Scatter(x=R["x"], y=R["mu"], name="Mu",
-                                   fill="tozeroy", line_color="rgba(220,50,50,0.8)"))
-        fig4.update_layout(height=380, xaxis_title="x (m)", yaxis_title="Moment (kNm/m)")
+                                   fill="tozeroy",
+                                   fillcolor="rgba(220,50,50,0.09)",
+                                   line=dict(color="rgba(220,50,50,0.85)", width=2)))
+        fig4.update_layout(
+            height=380,
+            xaxis=dict(title="x (m)", gridcolor="rgba(203,213,225,0.5)",
+                       tickfont=dict(family="IBM Plex Mono", size=10)),
+            yaxis=dict(title="Moment (kNm/m)", gridcolor="rgba(203,213,225,0.5)",
+                       tickfont=dict(family="IBM Plex Mono", size=10)),
+            plot_bgcolor="#FAFBFD", paper_bgcolor="white",
+            legend=dict(font=dict(family="IBM Plex Sans", size=11)),
+            margin=dict(t=20, b=40, l=60, r=20),
+        )
         st.plotly_chart(fig4, use_container_width=True)
         rows_flx = []
         for i in sta_idx:
@@ -1666,11 +2141,22 @@ try:
         st.subheader("Shear Strength  —  Strength I  (β=2.0)")
         fig5 = go.Figure([
             go.Scatter(x=R["x"], y=R["phi_Vn"], name="φVn",
-                       line=dict(color="green", width=2)),
-            go.Scatter(x=R["x"], y=R["vu"],     name="Vu  (factored)",
-                       fill="tozeroy", line_color="rgba(0,100,220,0.8)"),
+                       line=dict(color="#2F855A", width=2.2)),
+            go.Scatter(x=R["x"], y=R["vu"], name="Vu  (factored)",
+                       fill="tozeroy",
+                       fillcolor="rgba(37,88,212,0.09)",
+                       line=dict(color="rgba(37,88,212,0.85)", width=2)),
         ])
-        fig5.update_layout(height=380, xaxis_title="x (m)", yaxis_title="Shear (kN/m)")
+        fig5.update_layout(
+            height=380,
+            xaxis=dict(title="x (m)", gridcolor="rgba(203,213,225,0.5)",
+                       tickfont=dict(family="IBM Plex Mono", size=10)),
+            yaxis=dict(title="Shear (kN/m)", gridcolor="rgba(203,213,225,0.5)",
+                       tickfont=dict(family="IBM Plex Mono", size=10)),
+            plot_bgcolor="#FAFBFD", paper_bgcolor="white",
+            legend=dict(font=dict(family="IBM Plex Sans", size=11)),
+            margin=dict(t=20, b=40, l=60, r=20),
+        )
         st.plotly_chart(fig5, use_container_width=True)
         rows_shr = []
         for i in sta_idx:
@@ -1720,11 +2206,80 @@ try:
             for r in rows_sum
         )
         if all_ok:
-            st.success("✅  DESIGN ADEQUATE — All checks pass at all stations.")
+            st.markdown("""
+            <div style="
+                background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%);
+                border: 1.5px solid #6EE7B7;
+                border-left: 5px solid #059669;
+                border-radius: 8px;
+                padding: 1.1rem 1.5rem;
+                margin-top: 1rem;
+                display: flex; align-items: center; gap: 1rem;
+            ">
+                <span style="font-size:1.6rem;">✅</span>
+                <div>
+                    <div style="font-family:'IBM Plex Sans',sans-serif; font-size:0.95rem;
+                                font-weight:700; color:#065F46; letter-spacing:-0.01em;">
+                        DESIGN ADEQUATE
+                    </div>
+                    <div style="font-family:'IBM Plex Sans',sans-serif; font-size:0.80rem;
+                                color:#047857; margin-top:0.15rem;">
+                        All checks pass at all stations — Transfer · Service · Flexure · Shear
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
         else:
-            st.error("❌  DESIGN INADEQUATE — One or more checks fail. Revise design.")
+            st.markdown("""
+            <div style="
+                background: linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%);
+                border: 1.5px solid #FCA5A5;
+                border-left: 5px solid #DC2626;
+                border-radius: 8px;
+                padding: 1.1rem 1.5rem;
+                margin-top: 1rem;
+                display: flex; align-items: center; gap: 1rem;
+            ">
+                <span style="font-size:1.6rem;">❌</span>
+                <div>
+                    <div style="font-family:'IBM Plex Sans',sans-serif; font-size:0.95rem;
+                                font-weight:700; color:#991B1B; letter-spacing:-0.01em;">
+                        DESIGN INADEQUATE
+                    </div>
+                    <div style="font-family:'IBM Plex Sans',sans-serif; font-size:0.80rem;
+                                color:#B91C1C; margin-top:0.15rem;">
+                        One or more checks fail — Review section geometry, prestress force, or reinforcement.
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
-        st.caption("DCR: 🟢 ≤0.80  |  🟡 0.80–1.00  |  🔴 >1.00")
+        st.markdown("""
+        <div style="margin-top:0.85rem; padding:0.55rem 0.9rem;
+                    background:#F8FAFC; border:1px solid #DDE3EF;
+                    border-radius:6px; display:inline-flex; gap:1.5rem; align-items:center;">
+            <span style="font-family:'IBM Plex Sans',sans-serif; font-size:0.75rem;
+                         font-weight:600; color:#64748B; letter-spacing:0.04em;">DCR Legend</span>
+            <span style="font-size:0.75rem; color:#065F46; font-weight:500;">🟢 ≤ 0.80 &nbsp;Adequate</span>
+            <span style="font-size:0.75rem; color:#92400E; font-weight:500;">🟡 0.80–1.00 &nbsp;Marginal</span>
+            <span style="font-size:0.75rem; color:#991B1B; font-weight:500;">🔴 > 1.00 &nbsp;Overstressed</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # ── Professional footer ────────────────────────────────────────────────
+    st.markdown("""
+    <div style="margin-top:3rem; padding:1rem 0; border-top:1px solid #DDE3EF;
+                display:flex; justify-content:space-between; align-items:center;">
+        <div style="font-family:'IBM Plex Sans',sans-serif; font-size:0.70rem; color:#9CA3AF;">
+            <span style="font-weight:600; color:#6B7A99;">PSC Design Suite</span>
+            &nbsp;·&nbsp; AASHTO LRFD Bridge Design Specifications
+            &nbsp;·&nbsp; 1.0 m Transverse Strip Analysis
+        </div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:#CBD5E1;">
+            v3 Fixed &nbsp;·&nbsp; Top Flange Transverse Design
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 except Exception as err:
     st.error(f"Calculation error: {err}")
