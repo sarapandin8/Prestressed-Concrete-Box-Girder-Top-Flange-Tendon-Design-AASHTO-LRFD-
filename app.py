@@ -1,14 +1,15 @@
 """
-PSC Box Girder — Top Flange Transverse Design  (v3 fixed)
+PSC Box Girder — Top Flange Transverse Design  (v4 — Navy UI Edition)
 AASHTO LRFD Bridge Design Specifications  |  1.0 m transverse strip
 
-Fixes applied:
-  [BUG-A] fpe, Sb are numpy arrays → must index [i] inside station loop
-  [BUG-B] make_report() called before tabs → wrapped in separate try/except
-           so tabs always render even if report fails
-  [BUG-C] dp_neg = t−z  (hogging, compression face = BOTTOM)
-  [BUG-D] Vu uses factored shear magnitudes
-  [FIX-STATE] Robust Streamlit Session State binding for Save/Load (Prevent Rerun Loops)
+Changes from v3:
+  [UI-1] Navy sidebar with high-contrast white/light text
+  [UI-2] All input labels, captions, expander headers styled for readability
+  [UI-3] Prominent "Export Report (.docx)" button in both sidebar and main area
+  [UI-4] Summary metric cards in main area header
+  [UI-5] Result tabs with improved header styling
+
+Calculation logic: UNCHANGED from v3 fixed.
 """
 
 import math, datetime, json
@@ -26,68 +27,369 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 # ─────────────────────────────────────────────────────────────────────────────
 # 1.  CONFIG & SESSION STATE INITIALIZATION
 # ─────────────────────────────────────────────────────────────────────────────
-st.set_page_config(layout="wide", page_title="PSC Box Girder — Top Flange Design")
+st.set_page_config(
+    layout="wide",
+    page_title="PSC Box Girder — Top Flange Design",
+    page_icon="🏗️",
+)
 
+# ─────────────────────────────────────────────────────────────────────────────
+# CUSTOM CSS — Navy Sidebar + High-Contrast UI
+# ─────────────────────────────────────────────────────────────────────────────
+st.markdown("""
+<style>
+/* ── Google Font ── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* ── Global ── */
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
+}
+
+/* ═══════════════════════════════════════════════
+   SIDEBAR — Deep Navy Theme
+═══════════════════════════════════════════════ */
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #0a1628 0%, #0d1f3c 40%, #112244 100%) !important;
+    border-right: 1px solid #1e3a5f !important;
+}
+[data-testid="stSidebar"] > div:first-child {
+    background: transparent !important;
+}
+
+/* Sidebar text — bright white for max contrast */
+[data-testid="stSidebar"] p,
+[data-testid="stSidebar"] span,
+[data-testid="stSidebar"] label,
+[data-testid="stSidebar"] .stMarkdown,
+[data-testid="stSidebar"] .stMarkdown p,
+[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] p {
+    color: #e8f4fd !important;
+    font-weight: 500 !important;
+}
+
+/* Sidebar headers */
+[data-testid="stSidebar"] h1,
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] h3 {
+    color: #ffffff !important;
+    font-weight: 700 !important;
+}
+
+/* Sidebar input fields */
+[data-testid="stSidebar"] input[type="number"],
+[data-testid="stSidebar"] input[type="text"],
+[data-testid="stSidebar"] select,
+[data-testid="stSidebar"] textarea {
+    background-color: #1a3050 !important;
+    color: #ffffff !important;
+    border: 1px solid #2d5a8e !important;
+    border-radius: 6px !important;
+    font-weight: 500 !important;
+}
+[data-testid="stSidebar"] input[type="number"]:focus,
+[data-testid="stSidebar"] input[type="text"]:focus {
+    border-color: #4da6ff !important;
+    box-shadow: 0 0 0 2px rgba(77,166,255,0.25) !important;
+}
+
+/* Sidebar selectbox */
+[data-testid="stSidebar"] [data-testid="stSelectbox"] > div > div {
+    background-color: #1a3050 !important;
+    color: #ffffff !important;
+    border: 1px solid #2d5a8e !important;
+}
+
+/* Sidebar number input label */
+[data-testid="stSidebar"] .stNumberInput label,
+[data-testid="stSidebar"] .stTextInput label,
+[data-testid="stSidebar"] .stSelectbox label,
+[data-testid="stSidebar"] .stSlider label,
+[data-testid="stSidebar"] .stFileUploader label {
+    color: #93c5fd !important;
+    font-size: 0.78rem !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.02em !important;
+    text-transform: uppercase !important;
+}
+
+/* Sidebar number input arrows */
+[data-testid="stSidebar"] input[type="number"]::-webkit-inner-spin-button {
+    filter: invert(1) !important;
+}
+
+/* Sidebar expander header */
+[data-testid="stSidebar"] [data-testid="stExpander"] summary {
+    background-color: #162d50 !important;
+    border: 1px solid #1e3f6e !important;
+    border-radius: 8px !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    padding: 8px 12px !important;
+}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary:hover {
+    background-color: #1e3f6e !important;
+}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary p,
+[data-testid="stSidebar"] [data-testid="stExpander"] summary span {
+    color: #ffffff !important;
+    font-weight: 600 !important;
+}
+
+/* Expander content area */
+[data-testid="stSidebar"] [data-testid="stExpander"] > div:last-child {
+    background-color: rgba(10, 30, 60, 0.4) !important;
+    border: 1px solid #1e3a5f !important;
+    border-top: none !important;
+    border-radius: 0 0 8px 8px !important;
+    padding: 8px !important;
+}
+
+/* Sidebar caption */
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
+    color: #7eb3e6 !important;
+    font-size: 0.73rem !important;
+    font-weight: 400 !important;
+    text-transform: none !important;
+}
+
+/* Sidebar slider */
+[data-testid="stSidebar"] .stSlider [role="slider"] {
+    background-color: #4da6ff !important;
+    border: 2px solid #ffffff !important;
+}
+[data-testid="stSidebar"] .stSlider [data-baseweb="slider"] > div:first-child {
+    background-color: #2d5a8e !important;
+}
+
+/* Sidebar file uploader */
+[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] {
+    background-color: #1a3050 !important;
+    border: 2px dashed #2d5a8e !important;
+    color: #93c5fd !important;
+}
+[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] span,
+[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] p {
+    color: #93c5fd !important;
+}
+
+/* Sidebar horizontal rule */
+[data-testid="stSidebar"] hr {
+    border-color: #1e3a5f !important;
+    border-width: 1px !important;
+    margin: 10px 0 !important;
+}
+
+/* Sidebar info/success/error boxes */
+[data-testid="stSidebar"] [data-testid="stAlert"] {
+    border-radius: 6px !important;
+}
+[data-testid="stSidebar"] .stSuccess {
+    background-color: #0d3320 !important;
+    border-color: #1a6b3a !important;
+    color: #4ade80 !important;
+}
+[data-testid="stSidebar"] .stError {
+    background-color: #3b0d0d !important;
+    border-color: #7f1d1d !important;
+    color: #fca5a5 !important;
+}
+
+/* ── SAVE button (Download) — Gold accent in sidebar ── */
+[data-testid="stSidebar"] [data-testid="stDownloadButton"] button {
+    background: linear-gradient(135deg, #1e6030 0%, #2d8a4a 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 700 !important;
+    font-size: 0.85rem !important;
+    padding: 10px 16px !important;
+    letter-spacing: 0.03em !important;
+    transition: all 0.2s ease !important;
+}
+[data-testid="stSidebar"] [data-testid="stDownloadButton"] button:hover {
+    background: linear-gradient(135deg, #2d8a4a 0%, #38a85d 100%) !important;
+    box-shadow: 0 4px 15px rgba(45, 138, 74, 0.4) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* ═══════════════════════════════════════════════
+   MAIN AREA
+═══════════════════════════════════════════════ */
+
+/* Main app background */
+[data-testid="stAppViewContainer"] > .main {
+    background-color: #f0f4f8 !important;
+}
+
+/* Subheaders in main */
+.stApp h2, .stApp h3 {
+    color: #0d1f3c !important;
+    font-weight: 700 !important;
+}
+
+/* Metric containers */
+[data-testid="metric-container"] {
+    background: linear-gradient(135deg, #0d1f3c, #1a3a6e) !important;
+    border-radius: 10px !important;
+    padding: 14px 18px !important;
+    border: 1px solid #2d5a8e !important;
+}
+[data-testid="metric-container"] label {
+    color: #93c5fd !important;
+    font-size: 0.75rem !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase !important;
+}
+[data-testid="metric-container"] [data-testid="stMetricValue"] {
+    color: #ffffff !important;
+    font-size: 1.6rem !important;
+    font-weight: 800 !important;
+}
+[data-testid="metric-container"] [data-testid="stMetricDelta"] {
+    color: #4ade80 !important;
+    font-weight: 600 !important;
+}
+
+/* Tab styling */
+[data-testid="stTabs"] [role="tab"] {
+    background-color: #e8f0f8 !important;
+    color: #0d1f3c !important;
+    border-radius: 8px 8px 0 0 !important;
+    font-weight: 600 !important;
+    border: 1px solid #c5d5e8 !important;
+    border-bottom: none !important;
+    padding: 8px 16px !important;
+    font-size: 0.83rem !important;
+}
+[data-testid="stTabs"] [role="tab"][aria-selected="true"] {
+    background: linear-gradient(180deg, #0d1f3c, #1a3a6e) !important;
+    color: #ffffff !important;
+    border-color: #1a3a6e !important;
+}
+[data-testid="stTabs"] [role="tabpanel"] {
+    background-color: #ffffff !important;
+    border-radius: 0 0 10px 10px !important;
+    border: 1px solid #c5d5e8 !important;
+    padding: 20px !important;
+}
+
+/* Data editor */
+[data-testid="stDataEditor"] {
+    border-radius: 8px !important;
+    overflow: hidden !important;
+    border: 1px solid #c5d5e8 !important;
+}
+
+/* Info / warning / success / error in main */
+[data-testid="stAlert"][data-baseweb="notification"] {
+    border-radius: 8px !important;
+    font-weight: 500 !important;
+}
+
+/* ── EXPORT REPORT button — Prominent amber/gold ── */
+.export-btn-container button {
+    background: linear-gradient(135deg, #b45309 0%, #d97706 50%, #f59e0b 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 10px !important;
+    font-weight: 800 !important;
+    font-size: 1.0rem !important;
+    padding: 14px 28px !important;
+    letter-spacing: 0.04em !important;
+    box-shadow: 0 4px 20px rgba(217, 119, 6, 0.45) !important;
+    transition: all 0.25s ease !important;
+}
+.export-btn-container button:hover {
+    background: linear-gradient(135deg, #d97706 0%, #f59e0b 50%, #fbbf24 100%) !important;
+    box-shadow: 0 6px 28px rgba(251, 191, 36, 0.55) !important;
+    transform: translateY(-2px) !important;
+}
+
+/* ── Column headers in dataframes ── */
+.stDataFrame thead th {
+    background-color: #0d1f3c !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+}
+
+/* Subheader in main content */
+.block-container h2 {
+    padding-top: 0.5rem !important;
+    border-bottom: 2px solid #c5d5e8 !important;
+    padding-bottom: 6px !important;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────────────────────────────────────
 DEFAULT_SCALARS = dict(
     width=12.0, cl_lweb=2.0, cl_rweb=10.0,
     fc=45.0, fci=36.0, fpu=1860.0, fpy_ratio=0.90,
     aps_strand=140.0, duct_dia_mm=70.0,
     num_tendon=1, n_strands=5,
     fpi_ratio=0.75,
-    t0=3, RH=75,  # transfer age (days), relative humidity (%)
+    t0=3, RH=75,
     anch_slip_mm=6.0,
     phi_flex=1.00, phi_shear=0.90,
     proj_name="Box Girder Design", doc_no="CALC-STR-001",
     eng_name="Engineer Name", chk_name="Checker Name",
 )
 DEFAULT_TABLES = dict(
-    df_thickness={"x (m)": [0.00, 1.00, 2.00, 3.00, 4.00, 5.00, 6.00, 7.00, 8.00, 9.00, 10.00, 11.00, 12.00], "t (m)": [0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250]},
-    df_tendon={"x (m)": [0.00, 1.00, 2.00, 3.00, 4.00, 5.00, 6.00, 7.00, 8.00, 9.00, 10.00, 11.00, 12.00], "z_top (m)": [0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100]},
+    df_thickness={"x (m)": [0,1,2,3,4,5,6,7,8,9,10,11,12],
+                  "t (m)":  [0.25]*13},
+    df_tendon=   {"x (m)": [0,1,2,3,4,5,6,7,8,9,10,11,12],
+                  "z_top (m)": [0.10]*13},
     df_load={
-        "x (m)":         [ 0.00, 1.00, 2.00, 3.00, 4.00, 5.00, 6.00, 7.00, 8.00, 9.00, 10.00, 11.00, 12.00],
-        "M_DL (kNm/m)":  [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
-        "V_DL (kN/m)":   [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
-        "M_SDL (kNm/m)": [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
-        "V_SDL (kN/m)":  [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
-        "M_LL (kNm/m)":  [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
-        "V_LL (kN/m)":   [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
+        "x (m)":         [0,1,2,3,4,5,6,7,8,9,10,11,12],
+        "M_DL (kNm/m)":  [0]*13,  "V_DL (kN/m)":  [0]*13,
+        "M_SDL (kNm/m)": [0]*13,  "V_SDL (kN/m)": [0]*13,
+        "M_LL (kNm/m)":  [0]*13,  "V_LL (kN/m)":  [0]*13,
     },
 )
 
-# ── Init scalars
 for k, v in DEFAULT_SCALARS.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# ── Init table SOURCE keys (never same as editor widget key)
-# Rule: data_editor(data=session_state["thk_src"], key="ed_thk")
-#   - thk_src = stable data source, only changes on file load
-#   - ed_thk  = widget internal state managed by Streamlit (never write to it)
-# This prevents StreamlitValueAssignmentNotAllowedError AND double-input issue
 _TABLE_SRC = {"thk_src": "df_thickness", "tdn_src": "df_tendon", "ld_src": "df_load"}
 for src_key, tbl_key in _TABLE_SRC.items():
     if src_key not in st.session_state:
         st.session_state[src_key] = pd.DataFrame(DEFAULT_TABLES[tbl_key])
 
-# _tbl_ver: increment on load → editor key changes → widget reinits from new src
 if "_tbl_ver" not in st.session_state:
     st.session_state["_tbl_ver"] = 0
-
-# _loaded_hash: prevent rerun loop with static uploader key
 if "_loaded_hash" not in st.session_state:
     st.session_state["_loaded_hash"] = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 2.  SIDEBAR (Native State Binding)
+# 2.  SIDEBAR
 # ─────────────────────────────────────────────────────────────────────────────
 with st.sidebar:
-# ── 💾 SAVE / 📂 OPEN ────────────────────────────────────────────────────
-    st.markdown("---")
-    with st.expander("💾  Save  /  📂  Open Project", expanded=True):
+    # Logo / Header
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, #0a1628, #162d50);
+        border-radius: 10px;
+        padding: 14px 16px;
+        margin-bottom: 12px;
+        border: 1px solid #1e3f6e;
+    ">
+        <div style="font-size:1.3rem; font-weight:800; color:#ffffff; line-height:1.2;">
+            🏗️ PSC Box Girder
+        </div>
+        <div style="font-size:0.68rem; color:#93c5fd; font-weight:600;
+                    letter-spacing:0.12em; margin-top:4px; text-transform:uppercase;">
+            AASHTO LRFD  ·  1.0 m Transverse Strip
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-        # ── SAVE ─────────────────────────────────────────────────────────────
-        # Read from _cur_thk/_cur_tdn/_cur_ld = data_editor return values
+    # ── 💾 SAVE / 📂 OPEN ────────────────────────────────────────────────────
+    with st.expander("💾  Save  /  📂  Open Project", expanded=True):
         def _tbl_to_dict(cur_key, src_key):
             df = st.session_state.get(cur_key,
                  st.session_state.get(src_key, pd.DataFrame()))
@@ -117,9 +419,6 @@ with st.sidebar:
         st.caption("ตั้ง Chrome: Settings → Downloads → 'Ask where to save'")
         st.markdown("---")
 
-        # ── OPEN ─────────────────────────────────────────────────────────────
-        # Static key → file always reaches handler
-        # Hash check → process each unique file once (no rerun loop)
         uploaded_file = st.file_uploader(
             "📂  Open Project  (.json)", type="json",
             key="proj_uploader",
@@ -131,7 +430,6 @@ with st.sidebar:
             if st.session_state["_loaded_hash"] != _fhash:
                 try:
                     loaded = json.loads(_raw.decode("utf-8"))
-                    # Load scalars
                     for k, v in loaded.get("scalars", {}).items():
                         if k in DEFAULT_SCALARS:
                             dv = DEFAULT_SCALARS[k]
@@ -139,7 +437,6 @@ with st.sidebar:
                                 int(v)   if isinstance(dv, int)   else
                                 float(v) if isinstance(dv, float) else str(v)
                             )
-                    # Load tables → update src keys
                     _lmap = {"df_thickness":"thk_src","df_tendon":"tdn_src","df_load":"ld_src"}
                     for tbl_key, src_key in _lmap.items():
                         raw_tbl = loaded.get("tables", {}).get(tbl_key)
@@ -148,7 +445,6 @@ with st.sidebar:
                             for col in ndf.columns:
                                 ndf[col] = pd.to_numeric(ndf[col], errors="coerce")
                             st.session_state[src_key] = ndf.dropna(how="all")
-                    # Increment version → editor keys change → widgets reinit from new src
                     st.session_state["_tbl_ver"] += 1
                     for k in ["_cur_thk", "_cur_tdn", "_cur_ld"]:
                         st.session_state.pop(k, None)
@@ -157,63 +453,59 @@ with st.sidebar:
                     st.rerun()
                 except Exception as e:
                     st.error(f"❌  Load error: {e}")
-    # ── 📐 Materials & Section ───────────────────────────────────────────────
-    with st.expander("📐 Materials & Section", expanded=True):
-        # ใช้ key=... อย่างเดียว Streamlit จะซิงค์ค่าให้เอง และไม่ค้างตอนโหลด
+
+    # ── Materials & Section ──────────────────────────────────────────────────
+    with st.expander("📐  Materials & Section", expanded=True):
         width       = st.number_input("Total Flange Width (m)",   min_value=1.0, key="width")
         fc          = st.number_input("f'c  Service (MPa)",       min_value=20.0, key="fc")
         fci         = st.number_input("f'ci Transfer (MPa)",      min_value=15.0, key="fci")
         fpu         = st.number_input("fpu (MPa)",                key="fpu")
-        
-        # Selectbox logic
         fpy_opts = [0.90, 0.85]
         if st.session_state.fpy_ratio not in fpy_opts:
             st.session_state.fpy_ratio = 0.90
-        fpy_ratio   = st.selectbox("fpy/fpu", fpy_opts, key="fpy_ratio", help="Low-relaxation=0.90  |  Stress-relieved=0.85")
-        
+        fpy_ratio   = st.selectbox("fpy/fpu", fpy_opts, key="fpy_ratio",
+                                   help="Low-relaxation=0.90  |  Stress-relieved=0.85")
         aps_strand  = st.number_input("Aps per strand (mm²)",     key="aps_strand")
         duct_dia_mm = st.number_input("Duct diameter (mm)",       min_value=20.0, key="duct_dia_mm")
 
-    # ── 🌐 Web Geometry ──────────────────────────────────────────────────────
+    # ── Web Geometry ─────────────────────────────────────────────────────────
     with st.expander("🌐  Web Geometry", expanded=True):
         st.caption("ระบุตำแหน่ง Centerline ของ Web ซ้าย-ขวา จากขอบซ้ายของ Flange")
         col_wl, col_wr = st.columns(2)
         cl_lweb = col_wl.number_input("CL. L.Web (m)", min_value=0.0, step=0.05, key="cl_lweb")
         cl_rweb = col_wr.number_input("CL. R.Web (m)", min_value=0.0, step=0.05, key="cl_rweb")
-        st.info(f"CL.L.Web = **{cl_lweb*1000:.0f} mm** |  "
-                f"CL.R.Web = **{cl_rweb*1000:.0f} mm** |  "
-                f"Span = **{(cl_rweb-cl_lweb)*1000:.0f} mm**")
+        st.info(f"Span = **{(cl_rweb-cl_lweb)*1000:.0f} mm**  |  "
+                f"L.Web = {cl_lweb*1000:.0f} mm  |  R.Web = {cl_rweb*1000:.0f} mm")
 
-    # ── 🔩 Prestressing Force ────────────────────────────────────────────────
-    with st.expander("🔩 Prestressing Force", expanded=True):
+    # ── Prestressing Force ───────────────────────────────────────────────────
+    with st.expander("🔩  Prestressing Force", expanded=True):
         num_tendon = st.number_input("Tendons per 1 m strip", min_value=1, key="num_tendon")
         n_strands  = st.number_input("Strands per tendon",    min_value=1, key="n_strands")
         fpi_ratio  = st.slider("Jacking stress  fpi/fpu", 0.70, 0.80, key="fpi_ratio",
                                help="Standard = 0.75 fpu  (AASHTO 5.9.2.2)")
 
-    # ── 📉 Prestress Losses (AASHTO LRFD 5.9.3) ─────────────────────────────
-    with st.expander("📉 Prestress Loss Parameters", expanded=True):
-        st.caption("แอปคำนวณ Loss ตาม AASHTO LRFD 5.9.3 อัตโนมัติ")
-        t0_val       = st.number_input("Age at Transfer  t₀ (days)", min_value=1, key="t0",
-                                       help="อายุคอนกรีตขณะ Transfer (ปกติ 3–7 วัน)")
-        rh_val       = st.number_input("Relative Humidity  RH (%)", min_value=30,
-                                       max_value=100, key="RH",
-                                       help="ค่าความชื้นสัมพัทธ์เฉลี่ยของสภาพแวดล้อม")
-        anch_val     = st.number_input("Anchorage Slip  Δ (mm)", value=6.0, min_value=0.0,
-                                       key="anch_slip_mm", help="ค่ามาตรฐาน = 6 mm")
-        st.caption("ค่าคงที่มาตรฐาน (7-wire low-relax, internal grouted PT):")
-        st.markdown("- μ = 0.20, K = 0.0066 rad/m  *(AASHTO Table 5.9.3.2.1b-1)*")
-        st.markdown("- Ep = 197,000 MPa  *(AASHTO 5.4.4.2)*")
-        st.markdown("- Jacking: 0.75fpu, One-end")
+    # ── Prestress Losses ─────────────────────────────────────────────────────
+    with st.expander("📉  Prestress Loss Parameters", expanded=True):
+        st.caption("คำนวณ Loss ตาม AASHTO LRFD 5.9.3 อัตโนมัติ")
+        t0_val   = st.number_input("Age at Transfer  t₀ (days)", min_value=1, key="t0")
+        rh_val   = st.number_input("Relative Humidity  RH (%)", min_value=30, max_value=100, key="RH")
+        anch_val = st.number_input("Anchorage Slip  Δ (mm)", value=6.0, min_value=0.0,
+                                   key="anch_slip_mm")
+        st.caption("Constants: μ=0.20, K=0.0066 rad/m, Ep=197,000 MPa")
 
-    # ── ⚖️ Resistance Factors ────────────────────────────────────────────────
-    with st.expander("⚖️ Resistance Factors φ"):
+    # ── Resistance Factors ───────────────────────────────────────────────────
+    with st.expander("⚖️  Resistance Factors φ"):
         phi_flex  = st.number_input("φ  Flexure", min_value=0.75, max_value=1.00, key="phi_flex")
         phi_shear = st.number_input("φ  Shear",   min_value=0.70, max_value=1.00, key="phi_shear")
 
-    # ── 📄 Report Info ────────────────────────────────────────────────────────
-    st.markdown("---")
-    st.subheader("📄 Report Information")
+    # ── Report Info ──────────────────────────────────────────────────────────
+    st.markdown("""
+    <div style="color:#93c5fd; font-size:0.72rem; font-weight:700;
+                letter-spacing:0.1em; text-transform:uppercase;
+                padding:10px 0 4px 0;">
+        📄  Report Information
+    </div>
+    """, unsafe_allow_html=True)
     proj_name = st.text_input("Project Name", key="proj_name")
     doc_no    = st.text_input("Document No.", key="doc_no")
     eng_name  = st.text_input("Prepared by",  key="eng_name")
@@ -221,225 +513,185 @@ with st.sidebar:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# 3.  MAIN HEADER
+# ─────────────────────────────────────────────────────────────────────────────
+st.markdown("""
+<div style="
+    background: linear-gradient(135deg, #0a1628 0%, #0d2044 50%, #112244 100%);
+    border-radius: 12px;
+    padding: 22px 28px 18px;
+    margin-bottom: 20px;
+    border: 1px solid #1e3a5f;
+    box-shadow: 0 4px 20px rgba(10,22,40,0.4);
+">
+    <div style="font-size:1.5rem; font-weight:800; color:#ffffff; line-height:1.2;">
+        🏗️  PSC Box Girder — Top Flange Transverse Design
+    </div>
+    <div style="font-size:0.82rem; color:#93c5fd; margin-top:6px; font-weight:500;">
+        AASHTO LRFD Bridge Design Specifications  ·  1.0 m transverse strip  ·
+        Compression (−)  Tension (+)  ·  +M = sagging
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────────────────────────────────────
 # 3.  DATA EDITORS
 # ─────────────────────────────────────────────────────────────────────────────
-st.title("🏗️  PSC Box Girder — Top Flange Transverse Design")
-st.caption("AASHTO LRFD  |  1.0 m transverse strip  |  "
-           "Compression (−)  Tension (+)  |  +M = sagging")
-
-# Versioned keys: change on file load → widgets reinit from updated src
 _v = st.session_state["_tbl_ver"]
+
+st.markdown("""
+<div style="
+    background: #ffffff;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    border: 1px solid #c5d5e8;
+">
+    <div style="font-size:1.0rem; font-weight:700; color:#0d1f3c; margin-bottom:4px;">
+        📊  Input Station Tables
+    </div>
+    <div style="font-size:0.8rem; color:#4a6080;">
+        ระบุข้อมูล Thickness · Tendon Profile · Loads ตามตำแหน่ง x (m)
+        — แถวจะถูก sort และ interpolate อัตโนมัติ
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 c1, c2 = st.columns(2)
 with c1:
-    st.subheader("📏 Flange Thickness t(x)")
+    st.subheader("📏 Flange Thickness  t(x)")
     df_thk = st.data_editor(
-        st.session_state["thk_src"], num_rows="dynamic", key=f"ed_thk_{_v}")
-    st.session_state["_cur_thk"] = df_thk   # plain DataFrame for Save
+        st.session_state["thk_src"], num_rows="dynamic", key=f"ed_thk_{_v}",
+        use_container_width=True)
+    st.session_state["_cur_thk"] = df_thk
 
-    st.subheader("🔩 Tendon Profile z(x)  [from top face]")
+    st.subheader("🔩 Tendon Profile  z(x)  [from top face]")
     df_tdn = st.data_editor(
-        st.session_state["tdn_src"], num_rows="dynamic", key=f"ed_tdn_{_v}")
+        st.session_state["tdn_src"], num_rows="dynamic", key=f"ed_tdn_{_v}",
+        use_container_width=True)
     st.session_state["_cur_tdn"] = df_tdn
 with c2:
     st.subheader("📦 Loads per 1 m strip")
     df_ld = st.data_editor(
-        st.session_state["ld_src"], num_rows="dynamic", key=f"ed_ld_{_v}")
+        st.session_state["ld_src"], num_rows="dynamic", key=f"ed_ld_{_v}",
+        use_container_width=True)
     st.session_state["_cur_ld"] = df_ld
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PRESTRESS LOSS ENGINE  (AASHTO LRFD 5.9.3)
+# PRESTRESS LOSS ENGINE  (AASHTO LRFD 5.9.3)  — UNCHANGED
 # ─────────────────────────────────────────────────────────────────────────────
 def calc_losses(dft, dfp, fc, fci, fpu, fpi_ratio, aps_strand,
                 num_tendon, n_strands, duct_dia_mm,
                 t0, RH, anch_slip_mm, width):
-    """
-    Prestress loss calculation per AASHTO LRFD 5.9.3.
-    Immediate: Friction (5.9.3.2.1) + Anchorage Set (5.9.3.2.2) + Elastic Shortening (5.9.3.2.3)
-    Long-term: Shrinkage + Creep (5.9.3.4) + Relaxation (5.9.3.4.3)
-    All stress in MPa. Geometry at midspan (representative section).
-    """
-    # ── Constants ──────────────────────────────────────────────────────────
-    Ep    = 197_000.0    # Modulus of elasticity of prestress steel (MPa) [AASHTO 5.4.4.2]
-    mu    = 0.20         # Friction coefficient (-) for grouted PT duct [AASHTO Table 5.9.3.2.1b-1]
-    K_wob = 0.0066       # Wobble coefficient (rad/m) for grouted duct
-    KL    = 45.0         # Relaxation factor (-) for low-relaxation strand [AASHTO 5.9.3.4.3c]
-    b     = 1.0          # Strip width (m)
-    wc    = 2400.0       # Unit weight of concrete (kg/m³) normal weight
+    Ep    = 197_000.0
+    mu    = 0.20
+    K_wob = 0.0066
+    KL    = 45.0
+    b     = 1.0
+    wc    = 2400.0
 
-    # ── Section properties at midspan ─────────────────────────────────────
     x_mid  = width / 2.0
     t_mid  = float(np.interp(x_mid, dft["x (m)"], dft["t (m)"]))
     z_mid  = float(np.interp(x_mid, dfp["x (m)"], dfp["z_top (m)"]))
     yc_mid = t_mid / 2.0
-    e_mid  = yc_mid - z_mid    # Eccentricity (+: tendon above centroid) (m)
+    e_mid  = yc_mid - z_mid
 
-    Ag_mid = b * t_mid                       # Gross cross-sectional area (m²/m)
-    Ig_mid = b * t_mid**3 / 12.0             # Gross moment of inertia (m⁴/m)
+    Ag_mid = b * t_mid
+    Ig_mid = b * t_mid**3 / 12.0
     A_duct = math.pi / 4.0 * (duct_dia_mm / 1000.0)**2
     n_duct = int(num_tendon)
     y_duct = z_mid - yc_mid
-    An_mid = Ag_mid - n_duct * A_duct        # Net area after duct deduction (m²/m)
-    In_mid = Ig_mid - n_duct * A_duct * y_duct**2  # Net inertia (m⁴/m)
-    VS     = (b * t_mid) / (2.0 * (b + t_mid))     # Volume-to-Surface ratio (m)
-    VS_mm  = VS * 1000.0                             # V/S in mm
+    An_mid = Ag_mid - n_duct * A_duct
+    In_mid = Ig_mid - n_duct * A_duct * y_duct**2
+    VS     = (b * t_mid) / (2.0 * (b + t_mid))
+    VS_mm  = VS * 1000.0
 
-    aps_m2  = aps_strand * 1e-6              # Area per strand (m²)
+    aps_m2  = aps_strand * 1e-6
     n_total = int(num_tendon * n_strands)
-    Aps     = n_total * aps_m2               # Total tendon area per 1m strip (m²/m)
+    Aps     = n_total * aps_m2
 
-    # ── Modulus of elasticity of concrete (AASHTO 5.4.2.4) ────────────────
-    # Ec = 0.043 × wc^1.5 × √f'c  (MPa, wc in kg/m³)
-    Ec  = 0.043 * (wc**1.5) * math.sqrt(fc)    # At service (MPa)
-    Eci = 0.043 * (wc**1.5) * math.sqrt(fci)   # At transfer (MPa)
+    Ec  = 0.043 * (wc**1.5) * math.sqrt(fc)
+    Eci = 0.043 * (wc**1.5) * math.sqrt(fci)
 
-    # ── Tendon geometry ────────────────────────────────────────────────────
-    # Angular change α = sum of absolute curvature changes along tendon (rad)
     xs = dft["x (m)"].values.astype(float)
     zs = np.interp(xs, dfp["x (m)"].values, dfp["z_top (m)"].values)
     dz = np.diff(zs); dx = np.diff(xs)
     dx_s = np.where(np.abs(dx) < 1e-9, 1e-9, dx)
     alpha = float(np.sum(np.abs(np.diff(np.append([0], np.arctan(dz / dx_s))))))
-    alpha = max(alpha, 0.001)              # Minimum curvature 1 mrad
-    L_ten = float(np.sum(np.sqrt(dx**2 + dz**2)))   # Tendon length along profile (m)
+    alpha = max(alpha, 0.001)
+    L_ten = float(np.sum(np.sqrt(dx**2 + dz**2)))
     if L_ten < 0.5: L_ten = float(xs[-1] - xs[0])
 
-    # ── Jacking parameters ─────────────────────────────────────────────────
-    fpj = fpu * fpi_ratio          # Jacking stress (MPa) = 0.75 fpu default
-    Pj  = Aps * fpj * 1e3          # Jacking force per 1m strip (kN/m)
+    fpj = fpu * fpi_ratio
+    Pj  = Aps * fpj * 1e3
 
-    # ══════════════════════════════════════════════════════════════════════
-    # SECTION A — IMMEDIATE LOSSES
-    # ══════════════════════════════════════════════════════════════════════
-
-    # ── A1. Friction Loss  ΔfpF  (AASHTO 5.9.3.2.1) ───────────────────────
-    # ΔfpF = fpj × (1 − e^(−μα − Kx))
-    # Evaluate at full length (dead end) and at midspan (representative)
     exp_full = mu * alpha + K_wob * L_ten
-    delta_fpF_full = fpj * (1.0 - math.exp(-exp_full))  # loss at dead end
+    delta_fpF_full = fpj * (1.0 - math.exp(-exp_full))
     exp_mid  = mu * (alpha / 2.0) + K_wob * (L_ten / 2.0)
-    delta_fpF = fpj * (1.0 - math.exp(-exp_mid))         # loss at midspan (used)
+    delta_fpF = fpj * (1.0 - math.exp(-exp_mid))
 
-    # ── A2. Anchorage Set Loss  ΔfpA  (AASHTO 5.9.3.2.2) ──────────────────
-    # Friction loss slope (rate of friction loss per unit length) [MPa/m]:
-    # w = fpj × (μ × α/L + K)   [MPa/m]
-    # [FIX] correct slope uses angular change rate (α/L), not just fpj/L
-    friction_slope = fpj * (mu * alpha / L_ten + K_wob)   # MPa/m
-
-    # Anchor set influence length:
-    # Lpa = √(Δ_m × Ep_MPa / friction_slope_MPa_per_m)   → result in metres
-    # Unit check: √(m × MPa / (MPa/m)) = √(m²) = m  ✓
-    Lpa = math.sqrt((anch_slip_mm / 1000.0) * Ep / friction_slope)   # m  [FIX: no /1e3]
+    friction_slope = fpj * (mu * alpha / L_ten + K_wob)
+    Lpa = math.sqrt((anch_slip_mm / 1000.0) * Ep / friction_slope)
     Lpa = min(Lpa, L_ten)
-
-    # Anchorage set stress loss at jacking end:
-    # ΔfpA = Δ_m × Ep_MPa / Lpa_m  [MPa]
     delta_fpA = (anch_slip_mm / 1000.0) * Ep / Lpa
-    delta_fpA = min(delta_fpA, 0.20 * fpj)   # sanity cap 20% of fpj
+    delta_fpA = min(delta_fpA, 0.20 * fpj)
 
-    # Stress in tendon at midspan after friction + anchor losses
-    # (anchor set affects tendon only within Lpa from jacking end)
     fpt_mid = fpj - delta_fpF - (delta_fpA if Lpa > L_ten / 2.0 else 0.0)
     fpt_mid = max(fpt_mid, 0.5 * fpj)
 
-    # ── A3. Elastic Shortening  ΔfpES  (AASHTO 5.9.3.2.3) ─────────────────
-    # fcgp = concrete stress at tendon CG level at transfer
-    # fcgp = Pi/An + Pi·e²/In   (compression positive for this term)
-    Pi_est = Aps * fpt_mid * 1e3           # Estimated Pi (kN/m)
-    fcgp   = (Pi_est/An_mid + Pi_est*e_mid**2/In_mid) / 1000.0  # MPa
-    # ΔfpES = (Ep/Eci) × fcgp
+    Pi_est = Aps * fpt_mid * 1e3
+    fcgp   = (Pi_est/An_mid + Pi_est*e_mid**2/In_mid) / 1000.0
     delta_fpES = (Ep / Eci) * fcgp
     delta_fpES = max(0.0, delta_fpES)
 
-    # ── Immediate loss totals ──────────────────────────────────────────────
     delta_imm   = delta_fpF + delta_fpA + delta_fpES
     imm_loss_pct = delta_imm / fpj * 100.0
 
-    fpi_eff  = max(fpj - delta_imm, 0.5 * fpj)   # Effective stress after transfer
-    Pi_final = Aps * fpi_eff * 1e3                # Pi per 1m strip (kN/m)
+    fpi_eff  = max(fpj - delta_imm, 0.5 * fpj)
+    Pi_final = Aps * fpi_eff * 1e3
 
-    # ══════════════════════════════════════════════════════════════════════
-    # SECTION B — LONG-TERM LOSSES  (AASHTO 5.9.3.4)
-    # ══════════════════════════════════════════════════════════════════════
-
-    # ── Correction factors ─────────────────────────────────────────────────
-    fci_ksi = fci / 6.895    # f'ci converted to ksi for AASHTO factor formulas
-
-    # kvs: Size factor for V/S ratio (AASHTO 5.4.2.3.2)
-    kvs = max(1.45 - 0.0052 * VS_mm, 1.0)    # V/S in mm
-
-    # khs: Humidity factor for shrinkage (AASHTO 5.4.2.3.3)
+    fci_ksi = fci / 6.895
+    kvs = max(1.45 - 0.0052 * VS_mm, 1.0)
     khs = max(2.00 - 0.014 * RH, 0.0)
-
-    # khc: Humidity factor for creep (AASHTO 5.4.2.3.2)
     khc = max(1.56 - 0.008 * RH, 0.0)
-
-    # kf: Concrete strength factor — uses f'ci in ksi (AASHTO 5.4.2.3.2)
-    # [FIX] must use ksi, not MPa
-    kf = 5.0 / (1.0 + fci_ksi)
-
-    # ktd: Time development factor (t→∞ for final losses: ktd = 1)
+    kf  = 5.0 / (1.0 + fci_ksi)
     ktd = 1.0
 
-    # ── B1. Shrinkage strain  εbdf  (AASHTO 5.4.2.3.3) ────────────────────
-    # εbdf = kvs × khs × kf × ktd × 0.48 × 10⁻³
-    eps_bdf = kvs * khs * kf * ktd * 0.48e-3   # Shrinkage strain (dimensionless)
+    eps_bdf  = kvs * khs * kf * ktd * 0.48e-3
+    delta_fpSH = eps_bdf * Ep
 
-    # Shrinkage loss (AASHTO 5.9.3.4.2a-1):
-    # ΔfpSH = εbdf × Ep
-    delta_fpSH = eps_bdf * Ep                   # MPa
-
-    # ── B2. Creep coefficient  ψb  (AASHTO 5.4.2.3.2) ─────────────────────
     ti_safe = max(float(t0), 1.0)
-    # ψb(t,ti) = 1.9 × kvs × khc × kf × ktd × ti^(−0.118)
-    psi_b = 1.9 * kvs * khc * kf * ktd * (ti_safe ** -0.118)
+    psi_b   = 1.9 * kvs * khc * kf * ktd * (ti_safe ** -0.118)
 
-    # Concrete stress at tendon CG at transfer  fcgp  (MPa)
-    fcgp_lt = (Pi_final/An_mid + Pi_final*e_mid**2/In_mid) / 1000.0  # MPa compression
+    fcgp_lt = (Pi_final/An_mid + Pi_final*e_mid**2/In_mid) / 1000.0
+    delta_fpCR = max((Ep / Ec) * fcgp_lt * psi_b, 0.0)
 
-    # Creep loss (AASHTO 5.9.3.4.2b-1):
-    # ΔfpCR = (Ep/Ec) × fcgp × ψb
-    delta_fpCR = max((Ep / Ec) * fcgp_lt * psi_b, 0.0)   # MPa
-
-    # ── B3. Relaxation after transfer  ΔfpR2  (AASHTO 5.9.3.4.3c) ─────────
-    # For low-relaxation strand:
-    # ΔfpR2 = (fpt/KL) × (fpt/fpy − 0.55)  ≥ 0
-    fpy = fpu * fpi_ratio / fpi_ratio * 0.9   # yield = 0.9 fpu for low-relax
-    # fpt = stress after subtracting portion of long-term losses
+    fpy = fpu * fpi_ratio / fpi_ratio * 0.9
     fpt_r = fpi_eff - 0.3 * (delta_fpSH + delta_fpCR)
     fpt_r = max(fpt_r, 0.5 * fpu)
-    delta_fpR = max((fpt_r / KL) * (fpt_r / fpy - 0.55), 0.0)   # MPa
+    delta_fpR = max((fpt_r / KL) * (fpt_r / fpy - 0.55), 0.0)
 
-    # ── Long-term totals ───────────────────────────────────────────────────
     delta_lt    = delta_fpSH + delta_fpCR + delta_fpR
     lt_loss_pct = delta_lt / fpj * 100.0
 
-    # ── Final effective prestress ──────────────────────────────────────────
     fpe_val  = max(fpi_eff - delta_lt, 0.45 * fpj)
-    Pe_final = Aps * fpe_val * 1e3    # Pe per 1m strip (kN/m)
+    Pe_final = Aps * fpe_val * 1e3
 
     return dict(
-        # Material
         Ec=Ec, Eci=Eci, Ep=Ep,
-        # Section
         t_mid=t_mid, z_mid=z_mid, e_mid=e_mid,
         Ag_mid=Ag_mid, Ig_mid=Ig_mid, An_mid=An_mid, In_mid=In_mid,
         VS=VS, VS_mm=VS_mm,
         Aps=Aps, n_total=n_total,
-        # Tendon geometry
         alpha=alpha, L_ten=L_ten, Lpa=Lpa, friction_slope=friction_slope,
-        # Jacking
         fpj=fpj, Pj=Pj,
-        # Immediate losses
         delta_fpF=delta_fpF, delta_fpF_full=delta_fpF_full,
         delta_fpA=delta_fpA, delta_fpES=delta_fpES,
         delta_imm=delta_imm, imm_loss_pct=imm_loss_pct,
         fcgp=fcgp, fpt_mid=fpt_mid, Pi=Pi_final,
-        # Long-term factors
         fci_ksi=fci_ksi, kvs=kvs, khs=khs, khc=khc, kf=kf, ktd=ktd,
         psi_b=psi_b, eps_bdf=eps_bdf,
-        # Long-term losses
         fcgp_lt=fcgp_lt, delta_fpSH=delta_fpSH,
         delta_fpCR=delta_fpCR, delta_fpR=delta_fpR,
         delta_lt=delta_lt, lt_loss_pct=lt_loss_pct,
@@ -448,8 +700,9 @@ def calc_losses(dft, dfp, fc, fci, fpu, fpi_ratio, aps_strand,
         total_loss_pct=(delta_imm + delta_lt) / fpj * 100.0,
     )
 
+
 # ─────────────────────────────────────────────────────────────────────────────
-# 4.  CALCULATION ENGINE
+# 4.  CALCULATION ENGINE  — UNCHANGED
 # ─────────────────────────────────────────────────────────────────────────────
 def prep(df):
     df = df.copy()
@@ -461,16 +714,13 @@ def prep(df):
     return df.sort_values("x (m)").drop_duplicates(subset="x (m)").reset_index(drop=True)
 
 def run_calc(dft, dfp, dfl, L):
-    """Run all calculations and return results dict."""
     N = 500; b = 1.0
     x = np.linspace(0, width, N)
 
-    # Geometry
     t  = np.interp(x, dft["x (m)"], dft["t (m)"])
     z  = np.interp(x, dfp["x (m)"], dfp["z_top (m)"])
     yc = t / 2.0
 
-    # Loads
     def ip(col): return np.interp(x, dfl["x (m)"], dfl[col])
     m_dl=ip("M_DL (kNm/m)"); v_dl=ip("V_DL (kN/m)")
     m_sdl=ip("M_SDL (kNm/m)"); v_sdl=ip("V_SDL (kN/m)")
@@ -479,29 +729,25 @@ def run_calc(dft, dfp, dfl, L):
     ms1 = m_dl + m_sdl + m_ll
     ms3 = m_dl + m_sdl + 0.8*m_ll
     mu  = 1.25*m_dl + 1.50*m_sdl + 1.75*m_ll
-    vu  = 1.25*np.abs(v_dl) + 1.50*np.abs(v_sdl) + 1.75*np.abs(v_ll)  # [FIX-D]
+    vu  = 1.25*np.abs(v_dl) + 1.50*np.abs(v_sdl) + 1.75*np.abs(v_ll)
 
-    # Gross section
     Ag = b * t
     Ig = b * t**3 / 12.0
 
-    # Net section (duct deduction — Transfer only)
     A_duct = math.pi / 4.0 * (duct_dia_mm / 1000.0)**2
     n_ducts = int(num_tendon)
     y_duct  = z - yc
     An = Ag - n_ducts * A_duct
     In = Ig - n_ducts * A_duct * y_duct**2
 
-    e = yc - z  # eccentricity
+    e = yc - z
 
-    # Prestress — use loss engine results (passed as argument)
     n_total = L["n_total"]
     Aps     = L["Aps"]
-    fpi_val = L["fpi_eff"]   # effective stress after immediate losses
+    fpi_val = L["fpi_eff"]
     Pi      = L["Pi"]
     Pe      = L["Pe"]
 
-    # Stress function
     def stress(P, M, ev, tv, Av, Iv):
         ht  = tv / 2.0
         top = (-P/Av + P*ev*ht/Iv - M*ht/Iv) / 1000.0
@@ -512,7 +758,6 @@ def run_calc(dft, dfp, dfl, L):
     sv1_top, sv1_bot = stress(Pe, ms1,  e, t, Ag, Ig)
     sv3_top, sv3_bot = stress(Pe, ms3,  e, t, Ag, Ig)
 
-    # Flexure — [FIX-C] correct dp per moment sign
     beta1 = float(np.clip(0.85 - 0.05*(fc-28.0)/7.0, 0.65, 0.85))
     k_fac = 2.0 * (1.04 - fpy_ratio)
 
@@ -524,7 +769,7 @@ def run_calc(dft, dfp, dfl, L):
         Mn_  = Aps * fps_ * (dp_s - a_/2.0) * 1000.0
         return c_, a_, fps_, Mn_
 
-    dp_pos = z;      dp_neg = t - z    # sagging=TOP, hogging=BOT
+    dp_pos = z;      dp_neg = t - z
     c_pos, a_pos, fps_pos, Mn_pos = flexure(dp_pos)
     c_neg, a_neg, fps_neg, Mn_neg = flexure(dp_neg)
     phi_Mn_pos =  phi_flex * Mn_pos
@@ -533,20 +778,17 @@ def run_calc(dft, dfp, dfl, L):
     cdp_pos = np.where(dp_pos > 0, c_pos/dp_pos, np.inf)
     cdp_neg = np.where(dp_neg > 0, c_neg/dp_neg, np.inf)
 
-    # Min reinforcement
-    fr  = 0.63 * math.sqrt(fc)        # scalar
-    fpe = Pe / Ag / 1000.0            # array — [FIX-A] index in loop
-    Sb  = Ig / yc                     # array — [FIX-A] index in loop
-    Mcr = (fr + fpe) * Sb / 1000.0   # array
+    fr  = 0.63 * math.sqrt(fc)
+    fpe = Pe / Ag / 1000.0
+    Sb  = Ig / yc
+    Mcr = (fr + fpe) * Sb / 1000.0
 
-    # Shear
     dp_use = np.maximum(dp_pos, dp_neg)
     dv     = np.maximum(0.9*dp_use, 0.72*t)
     Vc     = 0.083*2.0*1.0*math.sqrt(fc)*b*dv*1000.0
     Vn_lim = 0.25*fc*b*dv*1000.0
     phi_Vn = phi_shear * np.minimum(Vc, Vn_lim)
 
-    # Allowable limits
     lim_tr_c  = -0.60*fci;  lim_tr_t  =  0.25*math.sqrt(fci)
     lim_sv_cp = -0.45*fc;   lim_sv_ct = -0.60*fc
     lim_sv_t  =  0.50*math.sqrt(fc)
@@ -575,12 +817,12 @@ def run_calc(dft, dfp, dfl, L):
         lim_sv_cp=lim_sv_cp, lim_sv_ct=lim_sv_ct, lim_sv_t=lim_sv_t,
     )
 
+
 try:
     dft = prep(df_thk); dfp = prep(df_tdn); dfl = prep(df_ld)
     if any(len(d) < 2 for d in [dft, dfp, dfl]):
         st.warning("⚠️ Enter at least 2 rows in each table."); st.stop()
 
-    # Compute losses first, then pass to run_calc
     t0_v   = int(st.session_state.get("t0", 3))
     rh_v   = int(st.session_state.get("RH", 75))
     anch_v = float(st.session_state.get("anch_slip_mm", 6.0))
@@ -590,13 +832,27 @@ try:
                     t0_v, rh_v, anch_v, width)
     R = run_calc(dft, dfp, dfl, L)
 
-    # Station indices
     sta_x   = dfl["x (m)"].values
     sta_idx = [int(np.abs(R["x"] - v).argmin()) for v in sta_x]
     N       = len(R["x"])
 
     # ─────────────────────────────────────────────────────────────────
-    # 5.  REPORT GENERATOR   (called only on button press)
+    # SUMMARY METRIC CARDS
+    # ─────────────────────────────────────────────────────────────────
+    st.markdown("### 📊 Key Results")
+    mc1, mc2, mc3, mc4, mc5 = st.columns(5)
+    mc1.metric("Aps  (1m strip)",  f"{R['Aps']*1e6:.2f} mm²")
+    mc2.metric("Pi  (initial)",    f"{R['Pi']:.2f} kN/m")
+    mc3.metric("Pe  (effective)",  f"{R['Pe']:.2f} kN/m",
+               delta=f"eff. ratio = {L['eff_ratio']:.3f}")
+    mc4.metric("Total Loss",       f"{L['total_loss_pct']:.2f} %",
+               delta=f"imm={L['imm_loss_pct']:.1f}%  lt={L['lt_loss_pct']:.1f}%")
+    mc5.metric("Eff. Pe/Pi",       f"{L['eff_ratio']:.4f}")
+
+    st.markdown("---")
+
+    # ─────────────────────────────────────────────────────────────────
+    # 5.  REPORT GENERATOR  — UNCHANGED logic
     # ─────────────────────────────────────────────────────────────────
     def make_report():
         doc = Document()
@@ -648,12 +904,9 @@ try:
                         cell.width = Cm(cw[j])
             return t_
 
-        # ── Convenience: extract scalar from R at index i ─────────────
         def s(key, i): return float(R[key][i])
 
-        # ══════════════════════════════════════════════════════════════
         # COVER
-        # ══════════════════════════════════════════════════════════════
         blank(); blank()
         doc.add_heading("STRUCTURAL CALCULATION REPORT", 0)
         blank()
@@ -668,9 +921,7 @@ try:
         ], cw=[4.5,13.0])
         doc.add_page_break()
 
-        # ══════════════════════════════════════════════════════════════
         # SEC 1 — DESIGN BASIS
-        # ══════════════════════════════════════════════════════════════
         h1("1.  Design Basis")
         for it in [
             "Code: AASHTO LRFD Bridge Design Specifications",
@@ -686,9 +937,7 @@ try:
         ]: para(it, indent=0.3)
         blank()
 
-        # ══════════════════════════════════════════════════════════════
         # SEC 2 — INPUT SUMMARY
-        # ══════════════════════════════════════════════════════════════
         h1("2.  Design Input Summary")
 
         h2("2.1  Material Properties")
@@ -709,9 +958,9 @@ try:
             ["Total strands (1m strip)",  "n",       f"{R['n_total']}",          "—"],
             ["Total Aps (1m strip)",      "Aps",     f"{R['Aps']*1e6:.2f}",     "mm²/m"],
             ["Jacking stress ratio",      "fpi/fpu", f"{fpi_ratio:.4f}",         "—"],
-            ["Immediate loss (computed)",   "Δfi",    f"{R['L']['imm_loss_pct']:.2f}", "%"],
-            ["Long-term loss (computed)",   "ΔfLT",   f"{R['L']['lt_loss_pct']:.2f}",  "%"],
-            ["Total loss (computed)",       "Δftot",  f"{R['L']['total_loss_pct']:.2f}","%"],
+            ["Immediate loss (computed)", "Δfi",     f"{R['L']['imm_loss_pct']:.2f}", "%"],
+            ["Long-term loss (computed)", "ΔfLT",    f"{R['L']['lt_loss_pct']:.2f}",  "%"],
+            ["Total loss (computed)",     "Δftot",   f"{R['L']['total_loss_pct']:.2f}","%"],
         ], cw=[5.5,2.5,2.5,2.0])
         blank()
 
@@ -748,11 +997,8 @@ try:
         para("  M in kNm/m  |  V in kN/m", italic=True, color=C_GRAY)
         doc.add_page_break()
 
-        # ══════════════════════════════════════════════════════════════
-        # SEC 3 — GLOBAL PRESTRESS
-        # ══════════════════════════════════════════════════════════════
+        # SEC 3 — PRESTRESS LOSSES
         h1("3.  Prestress Loss Calculation  (AASHTO LRFD 5.9.3)")
-
         _L = R["L"]
         _fpj = _L["fpj"]
 
@@ -839,8 +1085,6 @@ try:
         blank()
 
         h2("3.5  Long-Term Losses  (Approximate Method, AASHTO 5.9.3.3)")
-        t0_v = int(st.session_state.get("t0", 3))
-        rh_v = int(st.session_state.get("RH", 75))
         para(f"t₀ = {t0_v} days  |  RH = {rh_v}%  |  V/S = {_L['VS_mm']:.1f} mm",
              italic=True, indent=0.3)
         blank()
@@ -876,7 +1120,6 @@ try:
 
         h3("3.5.2  Creep Loss  ΔfpCR  (AASHTO 5.9.3.3-1)")
         formula("ΔfpCR  =  10.0 × (fpi·Aps/Ag) × γh × γst")
-        Ag_v = float(_L["Ag_mid"]); fpi_v = float(_L["fpi_eff"]); Aps_v = float(_L["Aps"])
         subst( f"       =  ({197000:.0f}/{_L['Ec']:.0f}) × {_L['fcgp_lt']:.4f} × {_L['psi_b']:.4f}")
         result(f"ΔfpCR  =  {_L['delta_fpCR']:.4f} MPa")
         blank()
@@ -921,7 +1164,6 @@ try:
 
         h2("4.2  Jacking Stress  fpi  (after immediate losses)")
         formula("fpi  =  fpu × (fpi/fpu) × (1 − Δi/100)")
-        # เปลี่ยน {init_loss_pct:.1f} เป็น {_L['imm_loss_pct']:.1f}
         subst( f"     =  {fpu:.0f} × {fpi_ratio:.4f} × (1 − {_L['imm_loss_pct']:.1f}/100)")
         result(f"     =  {R['fpi_val']:.4f} MPa")
         blank()
@@ -934,7 +1176,6 @@ try:
 
         h2("4.4  Effective Prestress Force  Pe  (after all losses)")
         formula("Pe   =  Pi × (Pe/Pi)")
-        # เปลี่ยน {eff_ratio:.4f} เป็น {_L['eff_ratio']:.4f}
         subst( f"     =  {R['Pi']:.4f}  ×  {_L['eff_ratio']:.4f}")
         result(f"     =  {R['Pe']:.4f} kN/m")
 
@@ -948,15 +1189,12 @@ try:
         result(f"    =  {R['k_fac']:.4f}")
         doc.add_page_break()
 
-        # ══════════════════════════════════════════════════════════════
-        # SEC 4 — STATION-BY-STATION
-        # ══════════════════════════════════════════════════════════════
+        # SEC 5 — STATION-BY-STATION
         h1("5.  Detailed Station-by-Station Calculations")
         para("Calculations are presented per 1.0 m strip width at each station.", italic=True)
         blank()
 
         for ks, i in enumerate(sta_idx):
-            # ── extract all scalars at this station  [FIX-A: index arrays here]
             xi   = float(R["x"][i])
             ti   = float(R["t"][i]);       zi   = float(R["z"][i])
             yci  = float(R["yc"][i]);      ei   = float(R["e"][i])
@@ -978,10 +1216,9 @@ try:
             pMp  = float(R["phi_Mn_pos"][i])
             pMn_ = float(R["phi_Mn_neg"][i])
             cdpp = float(R["cdp_pos"][i]); cdpn = float(R["cdp_neg"][i])
-            # [FIX-A] index fpe and Sb as arrays
             fpei = float(R["fpe"][i]);     Sbi  = float(R["Sb"][i])
             Mcri = float(R["Mcr"][i])
-            fri  = float(R["fr"])          # scalar, no index needed
+            fri  = float(R["fr"])
             dvi  = float(R["dv"][i]);      Vci  = float(R["Vc"][i])
             pVi  = float(R["phi_Vn"][i]); Vnli = float(R["Vn_lim"][i])
             A_d  = float(R["A_duct"])
@@ -992,34 +1229,23 @@ try:
 
             doc.add_heading(f"4.{ks+1}   Station  x = {xi:.2f} m", level=2)
 
-            # 4.x.1  Section Properties
             h3(f"5.{ks+1}.1   Net Section Properties  (duct deducted — used at Transfer)")
             tbl(["Property","Formula","Substitution","Value","Unit"],[
-                ["Slab thickness",      "t",          "input",
-                 f"{ti*1000:.2f}","mm"],
-                ["Tendon CG from top",  "z",          "input",
-                 f"{zi*1000:.2f}","mm"],
-                ["Section centroid",    "yc = t/2",
-                 f"{ti*1000:.2f}/2", f"{yci*1000:.2f}","mm"],
-                ["Eccentricity",        "e = yc − z",
-                 f"{yci*1000:.2f}−{zi*1000:.2f}", f"{ei*1000:.4f}","mm"],
-                ["Gross area",          "Ag = 1000·t",
-                 f"1000×{ti*1000:.2f}", f"{Agi*1e6:.2f}","mm²/m"],
-                ["Gross inertia",       "Ig = 1000·t³/12",
-                 f"1000×{ti*1000:.2f}³/12", f"{Igi*1e12:.4f}×10⁻³","mm⁴/m"],
-                ["Duct area (each)",    "Ad = π·d²/4",
-                 f"π×{duct_dia_mm:.0f}²/4", f"{A_d*1e6:.3f}","mm²"],
-                ["Duct CG from CG",     "yd = z−yc",
-                 f"{zi*1000:.2f}−{yci*1000:.2f}", f"{ydi*1000:.4f}","mm"],
-                ["Net area",            "An = Ag − n·Ad",
-                 f"{Agi*1e6:.2f}−{n_d}×{A_d*1e6:.3f}", f"{Ani*1e6:.4f}","mm²/m"],
+                ["Slab thickness",      "t",          "input",                f"{ti*1000:.2f}","mm"],
+                ["Tendon CG from top",  "z",          "input",                f"{zi*1000:.2f}","mm"],
+                ["Section centroid",    "yc = t/2",   f"{ti*1000:.2f}/2",     f"{yci*1000:.2f}","mm"],
+                ["Eccentricity",        "e = yc − z", f"{yci*1000:.2f}−{zi*1000:.2f}", f"{ei*1000:.4f}","mm"],
+                ["Gross area",          "Ag = 1000·t",f"1000×{ti*1000:.2f}",  f"{Agi*1e6:.2f}","mm²/m"],
+                ["Gross inertia",       "Ig = 1000·t³/12",f"1000×{ti*1000:.2f}³/12",f"{Igi*1e12:.4f}×10⁻³","mm⁴/m"],
+                ["Duct area (each)",    "Ad = π·d²/4",f"π×{duct_dia_mm:.0f}²/4",f"{A_d*1e6:.3f}","mm²"],
+                ["Duct CG from CG",     "yd = z−yc",  f"{zi*1000:.2f}−{yci*1000:.2f}",f"{ydi*1000:.4f}","mm"],
+                ["Net area",            "An = Ag − n·Ad",f"{Agi*1e6:.2f}−{n_d}×{A_d*1e6:.3f}",f"{Ani*1e6:.4f}","mm²/m"],
                 ["Net inertia",         "In = Ig − n·Ad·yd²",
                  f"{Igi*1e12:.4f}×10⁻³−{n_d}×{A_d*1e6:.3f}×{ydi*1000:.4f}²×10⁻⁶",
                  f"{Ini*1e12:.6f}×10⁻³","mm⁴/m"],
             ], cw=[3.5,3.5,5.5,2.5,1.5])
             blank()
 
-            # 4.x.2  Load Combinations
             h3(f"5.{ks+1}.2   Load Combinations")
             tbl(["Combination","Expression","Substitution","Value","Unit"],[
                 ["Service I",
@@ -1036,10 +1262,8 @@ try:
             ], cw=[2.5,5.0,5.0,2.0,1.5])
             blank()
 
-            # 4.x.3  Transfer Stress
             h3(f"5.{ks+1}.3   Stress Check — Transfer  (AASHTO 5.9.2.3.1)")
-            para("Loading: Pi + M_DL  |  Net section (duct deducted)",
-                 italic=True, indent=0.3)
+            para("Loading: Pi + M_DL  |  Net section (duct deducted)", italic=True, indent=0.3)
             blank()
             para("Stress formula:", bold=True, indent=0.3)
             formula("σ_top = [ −Pi/An  +  Pi·e·yc/In  −  M·yc/In ] × 10⁻³  (MPa)")
@@ -1064,18 +1288,14 @@ try:
                f"σ_tr,bot = {trb:.4f} MPa  outside [{ltr_c:.3f}, +{ltr_t:.4f}] MPa")
             blank()
 
-            # 4.x.4  Service Stress
             h3(f"5.{ks+1}.4   Stress Check — Service I  (AASHTO 5.9.2.3.2)")
             para("Gross section used (ducts grouted).  Loading: Pe + load combination.",
                  italic=True, indent=0.3)
             blank()
-
             for (combo_name, M_i, t_s, b_s) in [
-                ("Service I  (compression & tension check)",
-                 ms1i, s1t, s1b),
+                ("Service I  (compression & tension check)", ms1i, s1t, s1b),
             ]:
-                para(f"── {combo_name}  |  M = {M_i:.4f} kNm/m ──",
-                     bold=True, indent=0.3)
+                para(f"── {combo_name}  |  M = {M_i:.4f} kNm/m ──", bold=True, indent=0.3)
                 formula(f"σ_top = [−{R['Pe']:.4f}/{Agi*1e6:.4f}"
                         f" + {R['Pe']:.4f}×{ei*1000:.4f}×{yci*1000:.4f}/{Igi*1e12:.6f}×10⁻³"
                         f" − {M_i:.4f}×{yci*1000:.4f}/{Igi*1e12:.6f}×10⁻³] × 10⁻³")
@@ -1088,11 +1308,9 @@ try:
                         f" − {R['Pe']:.4f}×{ei*1000:.4f}×{yci*1000:.4f}/{Igi*1e12:.6f}×10⁻³"
                         f" + {M_i:.4f}×{yci*1000:.4f}/{Igi*1e12:.6f}×10⁻³] × 10⁻³")
                 result(f"σ_bot  =  {b_s:.6f} MPa")
-                # Compression check (bottom)
                 pf(b_s >= lsv_ct,
                    f"σ_bot = {b_s:.4f} MPa  ≥  {lsv_ct:.3f} MPa  (−0.60·f'c)",
                    f"σ_bot = {b_s:.4f} MPa  <   {lsv_ct:.3f} MPa  EXCEEDS LIMIT")
-                # Tension check (Service I)
                 pf(t_s <= lsv_t,
                    f"σ_top = {t_s:.4f} MPa  ≤  +{lsv_t:.4f} MPa  (tension OK)",
                    f"σ_top = {t_s:.4f} MPa  >  +{lsv_t:.4f} MPa  TENSION EXCEEDED")
@@ -1101,22 +1319,17 @@ try:
                    f"σ_bot = {b_s:.4f} MPa  >  +{lsv_t:.4f} MPa  TENSION EXCEEDED")
                 blank()
 
-            # 4.x.5  Flexural Strength
             h3(f"5.{ks+1}.5   Flexural Strength Check — Strength I  (AASHTO 5.6.3)")
             para("Rectangular stress block | No mild steel | Separate +Mu / −Mu capacity",
                  italic=True, indent=0.3)
             blank()
-
             for (label, dp_v, c_v, a_v, fp_v, pMnv, cdpv, mux) in [
-                ("+Mu  (sagging, comp. face = TOP)",
-                 dpp, cpp, app, fpp,  pMp,       cdpp, mui),
-                ("−Mu  (hogging, comp. face = BOTTOM)",
-                 dpn, cpn, apn, fpn,  abs(pMn_), cdpn, mui),
+                ("+Mu  (sagging, comp. face = TOP)",       dpp, cpp, app, fpp,  pMp,       cdpp, mui),
+                ("−Mu  (hogging, comp. face = BOTTOM)",   dpn, cpn, apn, fpn,  abs(pMn_), cdpn, mui),
             ]:
                 para(f"── {label} ──", bold=True, indent=0.3)
                 para(f"  Effective depth  dp = {dp_v*1000:.2f} mm", indent=0.4)
                 blank()
-
                 para("  Step 1  Depth of neutral axis  c:", bold=True, indent=0.3)
                 formula("  c  =  Aps·fpu / (0.85·f'c·β₁·b·1000  +  k·Aps·fpu / dp)")
                 subst (f"     =  {R['Aps']*1e6:.4f}×{fpu:.0f}"
@@ -1124,7 +1337,6 @@ try:
                        f" + {R['k_fac']:.4f}×{R['Aps']*1e6:.4f}×{fpu:.0f}/{dp_v*1000:.2f})")
                 result(f"  c  =  {c_v*1000:.4f} mm")
                 blank()
-
                 para("  Step 2  Depth of stress block  a  =  β₁·c:", bold=True, indent=0.3)
                 formula(f"  a  =  {R['beta1']:.4f}  ×  {c_v*1000:.4f} mm")
                 result(f"  a  =  {a_v*1000:.4f} mm")
@@ -1132,41 +1344,34 @@ try:
                    f"a ({a_v*1000:.2f} mm) ≤ dp ({dp_v*1000:.2f} mm)  — rectangular section OK",
                    f"a ({a_v*1000:.2f} mm) > dp ({dp_v*1000:.2f} mm)  — T-section!")
                 blank()
-
                 para("  Step 3  Stress in prestress steel  fps:", bold=True, indent=0.3)
                 formula("  fps  =  fpu × [1 − k·(c/dp)]")
                 subst (f"      =  {fpu:.0f} × [1 − {R['k_fac']:.4f}×{c_v*1000:.4f}/{dp_v*1000:.2f}]")
                 result(f"  fps  =  {fp_v:.4f} MPa")
                 blank()
-
                 para("  Step 4  Nominal flexural resistance  Mn:", bold=True, indent=0.3)
                 formula("  Mn   =  Aps · fps · (dp − a/2)")
                 subst (f"      =  {R['Aps']*1e6:.4f}mm²  ×  {fp_v:.4f}MPa"
                        f"  ×  ({dp_v*1000:.2f} − {a_v*1000:.4f}/2)mm  × 10⁻⁶")
                 result(f"  Mn   =  {pMnv/phi_flex:.4f} kNm/m")
                 blank()
-
                 para("  Step 5  Factored resistance  φMn:", bold=True, indent=0.3)
                 formula(f"  φMn  =  {phi_flex:.2f}  ×  {pMnv/phi_flex:.4f}")
                 result(f"  φMn  =  {pMnv:.4f} kNm/m")
                 blank()
-
                 para("  Step 6  Demand/Capacity  (DCR):", bold=True, indent=0.3)
                 dcr_v = abs(mux)/pMnv if pMnv > 0 else 999
                 pf(abs(mux) <= pMnv,
                    f"|Mu|={abs(mux):.4f} ≤ φMn={pMnv:.4f} kNm/m  (DCR={dcr_v:.4f})",
                    f"|Mu|={abs(mux):.4f} > φMn={pMnv:.4f} kNm/m  (DCR={dcr_v:.4f})  FAILS")
                 blank()
-
-                para("  Step 7  Ductility  c/dp ≤ 0.42  (AASHTO 5.7.3.3.1):",
-                     bold=True, indent=0.3)
+                para("  Step 7  Ductility  c/dp ≤ 0.42  (AASHTO 5.7.3.3.1):", bold=True, indent=0.3)
                 formula(f"  c/dp  =  {c_v*1000:.4f} / {dp_v*1000:.2f}  =  {cdpv:.4f}")
                 pf(cdpv <= 0.42,
                    f"c/dp = {cdpv:.4f} ≤ 0.42  — tension-controlled",
                    f"c/dp = {cdpv:.4f} > 0.42  — NOT tension-controlled")
                 blank()
 
-            # Min reinforcement — [FIX-A] use fpei and Sbi (scalar)
             para("── Minimum Reinforcement  (AASHTO 5.6.3.3) ──", bold=True, indent=0.3)
             formula("Mcr  =  (fr + fpe) × Sb  × 10⁻³")
             formula(f"     =  ({fri:.4f} MPa  +  {fpei:.4f} MPa)  ×  {Sbi:.8f} m³")
@@ -1180,57 +1385,44 @@ try:
                f"φMn = {max(pMp, abs(pMn_)):.4f} < {min_req:.4f} kNm/m  INSUFFICIENT")
             blank()
 
-            # 4.x.6  Shear
             h3(f"5.{ks+1}.6   Shear Strength Check — Strength I  (AASHTO 5.7.3)")
             para("Simplified method: β=2.0  |  Vs=0 (no stirrups)  |  Vp=0",
                  italic=True, indent=0.3)
             blank()
-
-            para("  Step 1  Effective shear depth  dv  (AASHTO 5.7.2.8):",
-                 bold=True, indent=0.3)
+            para("  Step 1  Effective shear depth  dv  (AASHTO 5.7.2.8):", bold=True, indent=0.3)
             dp_use_v = max(dpp, dpn)
             formula("  dv  =  max(0.9·dp,  0.72·t)")
             subst (f"      =  max(0.9×{dp_use_v*1000:.2f}mm,  0.72×{ti*1000:.2f}mm)")
             result(f"  dv  =  {dvi*1000:.4f} mm")
             blank()
-
-            para("  Step 2  Concrete shear resistance  Vc  (AASHTO 5.7.3.3-3):",
-                 bold=True, indent=0.3)
+            para("  Step 2  Concrete shear resistance  Vc  (AASHTO 5.7.3.3-3):", bold=True, indent=0.3)
             formula("  Vc  =  0.083·β·λ·√f'c·bv·dv × 10⁻³")
             subst (f"      =  0.083×2.0×1.0×√{fc:.1f}×1000mm×{dvi*1000:.4f}mm × 10⁻³")
             result(f"  Vc  =  {Vci:.4f} kN/m")
             blank()
-
-            para("  Step 3  Upper limit  Vn,max  (AASHTO 5.7.3.3-2):",
-                 bold=True, indent=0.3)
+            para("  Step 3  Upper limit  Vn,max  (AASHTO 5.7.3.3-2):", bold=True, indent=0.3)
             formula("  Vn,max  =  0.25·f'c·bv·dv × 10⁻³")
             subst (f"         =  0.25×{fc:.1f}MPa×1000mm×{dvi*1000:.4f}mm × 10⁻³")
             result(f"  Vn,max  =  {Vnli:.4f} kN/m")
             blank()
-
             Vn_use = min(Vci, Vnli)
             para("  Step 4  Nominal shear resistance:", bold=True, indent=0.3)
             formula("  Vn  =  min(Vc, Vn,max)  [Vs=0, Vp=0]")
             result(f"  Vn  =  {Vn_use:.4f} kN/m")
             blank()
-
             para("  Step 5  Factored resistance  φVn:", bold=True, indent=0.3)
             formula(f"  φVn  =  {phi_shear:.2f}  ×  {Vn_use:.4f}")
             result(f"  φVn  =  {pVi:.4f} kN/m")
             blank()
-
             para("  Step 6  Demand/Capacity check:", bold=True, indent=0.3)
             dcr_sh = vui/pVi if pVi > 0 else 999
             pf(vui <= pVi,
                f"Vu={vui:.4f} ≤ φVn={pVi:.4f} kN/m  (DCR={dcr_sh:.4f})",
                f"Vu={vui:.4f} > φVn={pVi:.4f} kN/m  (DCR={dcr_sh:.4f})  INSUFFICIENT")
             blank()
-
             doc.add_page_break()
 
-        # ══════════════════════════════════════════════════════════════
-        # SEC 5 — SUMMARY
-        # ══════════════════════════════════════════════════════════════
+        # SEC 6 — SUMMARY
         h1("6.  Summary of Results — All Stations")
         sum_rows = []
         for i in sta_idx:
@@ -1296,22 +1488,76 @@ try:
         buf.seek(0)
         return buf
 
-    # ── Download button  [FIX-B] wrapped in own try so tabs always render ──
-    with st.sidebar:
-        st.markdown("---")
-        try:
-            report_bytes = make_report()
+    # ─────────────────────────────────────────────────────────────────
+    # EXPORT REPORT BUTTON — PROMINENT in main area + sidebar
+    # ─────────────────────────────────────────────────────────────────
+    try:
+        report_bytes = make_report()
+
+        # ── Main area prominent export button ─────────────────────────
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, #451a03, #78350f, #92400e);
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin-bottom: 24px;
+            border: 2px solid #d97706;
+            box-shadow: 0 4px 20px rgba(217,119,6,0.35);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        ">
+            <div style="font-size:2rem;">📥</div>
+            <div>
+                <div style="font-size:1.0rem; font-weight:800; color:#fde68a; line-height:1.2;">
+                    Export Calculation Report (.docx)
+                </div>
+                <div style="font-size:0.78rem; color:#fcd34d; margin-top:3px; font-weight:500;">
+                    รายงานการคำนวณฉบับสมบูรณ์ พร้อม Step-by-step derivation · ทุก Station
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        col_exp, col_pad = st.columns([1, 2])
+        with col_exp:
             st.download_button(
-                label="📥 Download Report (.docx)",
+                label="📥  Export Calculation Report  (.docx)",
                 data=report_bytes,
                 file_name=f"CalcReport_{proj_name.replace(' ','_')}.docx",
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=True,
+                type="primary",
             )
-        except Exception as rep_err:
-            st.error(f"Report error: {rep_err}")
+
+        # ── Sidebar export button ──────────────────────────────────────
+        with st.sidebar:
+            st.markdown("---")
+            st.markdown("""
+            <div style="text-align:center; color:#fcd34d; font-size:0.72rem;
+                        font-weight:700; letter-spacing:0.1em; text-transform:uppercase;
+                        margin-bottom:6px;">
+                📥  Export Calculation Report
+            </div>
+            """, unsafe_allow_html=True)
+            # Re-generate for sidebar button (separate BytesIO)
+            report_bytes2 = make_report()
+            st.download_button(
+                label="📥  Export Report  (.docx)",
+                data=report_bytes2,
+                file_name=f"CalcReport_{proj_name.replace(' ','_')}.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=True,
+                key="sidebar_export",
+            )
+
+    except Exception as rep_err:
+        st.error(f"Report generation error: {rep_err}")
+
+    st.markdown("---")
 
     # ─────────────────────────────────────────────────────────────────
-    # 6.  TABS  (always rendered — outside report try block)
+    # 6.  RESULT TABS  — UNCHANGED logic, improved styling
     # ─────────────────────────────────────────────────────────────────
     def dcr_style(df_in, col):
         def _s(val):
@@ -1332,12 +1578,12 @@ try:
         "📋 Summary",
     ])
 
+    # ── TAB 0: Geometry ───────────────────────────────────────────────
     with tabs[0]:
         st.subheader("Top Flange Cross-Section with Tendon Layout")
 
-        # ── x-axis in metres, y-axis in mm ─────────────────────────────
-        x_m    = R["x"]                    # metres (unchanged)
-        top_mm = np.zeros(N)               # y in mm
+        x_m    = R["x"]
+        top_mm = np.zeros(N)
         bot_mm = -R["t"] * 1000.0
         cg_mm  = -R["yc"] * 1000.0
         tdn_mm = -R["z"] * 1000.0
@@ -1345,16 +1591,11 @@ try:
         t_max_mm = float(R["t"].max()) * 1000.0
         t_min_mm = float(R["t"].min()) * 1000.0
 
-        # scaleratio: 1 y-unit (mm) = scale_k x-units (m)
-        # target: flange thickness ≈ 15% of visual width
-        # scale_k = (0.15 * width_m) / (t_max_mm / 1000)  → unitless ratio
         scale_k  = max(1.0, round(0.15 * width / (t_max_mm / 1000.0)))
         y_margin = t_max_mm * 1.8
         y_range  = [-t_max_mm - y_margin, y_margin]
 
         fig = go.Figure()
-
-        # Section fill
         fig.add_trace(go.Scatter(
             x=np.concatenate([x_m, x_m[::-1]]),
             y=np.concatenate([top_mm, bot_mm[::-1]]),
@@ -1363,24 +1604,18 @@ try:
             line=dict(color="steelblue", width=1.5),
             name="Top Flange", hoverinfo="skip",
         ))
-
-        # Section CG
         fig.add_trace(go.Scatter(
             x=x_m, y=cg_mm, mode="lines",
             line=dict(color="gray", dash="dot", width=1),
             name="Section CG",
         ))
-
-        # Tendon CGS — smooth line
         fig.add_trace(go.Scatter(
             x=x_m, y=tdn_mm, mode="lines",
             line=dict(color="red", width=2.0),
             name="Tendon CGS", showlegend=True,
         ))
-
-        # Tendon dots — input stations only
         _tdn_prep = prep(df_tdn)
-        tdn_dot_x = _tdn_prep["x (m)"].values          # metres
+        tdn_dot_x = _tdn_prep["x (m)"].values
         tdn_dot_y = -_tdn_prep["z_top (m)"].values * 1000.0
         fig.add_trace(go.Scatter(
             x=tdn_dot_x, y=tdn_dot_y, mode="markers",
@@ -1388,8 +1623,6 @@ try:
                         line=dict(color="white", width=1.5)),
             name="Tendon input pts", showlegend=True,
         ))
-
-        # Flange edges — cyan dotted
         for x_edge, label, a_pos in [
             (0.0,   "Edge L.Flange", "top right"),
             (width, "Edge R.Flange", "top left"),
@@ -1401,8 +1634,6 @@ try:
                 annotation_position=a_pos,
                 annotation_font=dict(size=10, color="rgba(0,150,150,1)"),
             )
-
-        # Web centerlines — orange dashed
         for x_wf, label, a_pos in [
             (cl_lweb, "CL. L.Web", "top right"),
             (cl_rweb, "CL. R.Web", "top left"),
@@ -1414,9 +1645,6 @@ try:
                 annotation_position=a_pos,
                 annotation_font=dict(size=10, color="rgba(200,100,0,1)"),
             )
-
-        # No station x-labels (removed as requested)
-
         fig.update_layout(
             title="Top Flange Cross-Section with Tendon Layout",
             height=420,
@@ -1434,8 +1662,8 @@ try:
             plot_bgcolor="white",
             margin=dict(t=50, b=80),
         )
-
         st.plotly_chart(fig, use_container_width=True)
+
         col_inf1, col_inf2, col_inf3, col_inf4 = st.columns(4)
         col_inf1.info(f"Scale y:x = 1:{int(scale_k)}")
         col_inf2.info(f"t_min = {t_min_mm:.0f} mm")
@@ -1447,8 +1675,8 @@ try:
         c2.metric("Pi", f"{R['Pi']:.2f} kN/m")
         c3.metric("Pe", f"{R['Pe']:.2f} kN/m")
 
+    # ── TAB 1: Prestress Losses ───────────────────────────────────────
     with tabs[1]:
-        # ── Prestress Losses Summary ────────────────────────────────────────
         st.subheader("📉 Prestress Loss Summary  (AASHTO LRFD 5.9.3)")
         _L = R["L"]
         _fpj = _L["fpj"]
@@ -1475,8 +1703,8 @@ try:
             ],
             "Key Params": [
                 f"μ={0.20}, K={0.0066}, α={_L['alpha']:.4f}rad",
-                f"Δ={st.session_state.get('anch_slip_mm',6):.0f}mm, Lpa={_L['Lpa']:.2f}m (anchor influence length)",
-                f"fcgp={_L['fcgp']:.3f}MPa (concrete stress at tendon CG at transfer), Eci={_L['Eci']:.0f}MPa",
+                f"Δ={st.session_state.get('anch_slip_mm',6):.0f}mm, Lpa={_L['Lpa']:.2f}m",
+                f"fcgp={_L['fcgp']:.3f}MPa, Eci={_L['Eci']:.0f}MPa",
                 "",
             ],
             "Loss (MPa)": [
@@ -1516,9 +1744,9 @@ try:
                 "Δfi + ΔfLT",
             ],
             "Key Params": [
-                f"εbdf={_L['eps_bdf']:.5f} (shrinkage strain), kvs={_L['kvs']:.3f} (V/S factor), khs={_L['khs']:.3f} (humidity factor for shrinkage), kf={_L['kf']:.3f} (strength factor)",
-                f"ψb={_L['psi_b']:.3f} (creep coefficient), fcgp={_L['fcgp_lt']:.3f}MPa (concrete stress at tendon CG), khc={_L['khc']:.3f} (humidity factor for creep)",
-                f"KL={45} (relaxation factor low-relax), fpt/fpy={_L['fpi_eff']/(_fpj*0.9):.3f}",
+                f"εbdf={_L['eps_bdf']:.5f}, kvs={_L['kvs']:.3f}, khs={_L['khs']:.3f}, kf={_L['kf']:.3f}",
+                f"ψb={_L['psi_b']:.3f}, fcgp={_L['fcgp_lt']:.3f}MPa, khc={_L['khc']:.3f}",
+                f"KL={45}, fpt/fpy={_L['fpi_eff']/(_fpj*0.9):.3f}",
                 "", "",
             ],
             "Loss (MPa)": [
@@ -1589,6 +1817,7 @@ try:
         }
         st.dataframe(pd.DataFrame(_factors), use_container_width=True)
 
+    # ── TAB 2: Transfer Stress ────────────────────────────────────────
     with tabs[2]:
         st.subheader("Stress Check — Transfer  (Pi + M_DL  |  Net section)")
         fig2 = go.Figure([
@@ -1609,6 +1838,7 @@ try:
                    for i in sta_idx]
         st.dataframe(pd.DataFrame(rows_tr), use_container_width=True)
 
+    # ── TAB 3: Service Stress ─────────────────────────────────────────
     with tabs[3]:
         st.subheader("Stress Check — Service I  (Pe + Ms1  |  Gross section)")
         fig3 = go.Figure([
@@ -1635,6 +1865,7 @@ try:
                    for i in sta_idx]
         st.dataframe(pd.DataFrame(rows_sv), use_container_width=True)
 
+    # ── TAB 4: Flexure ────────────────────────────────────────────────
     with tabs[4]:
         st.subheader("Flexural Strength Envelope  —  Strength I")
         fig4 = go.Figure()
@@ -1662,6 +1893,7 @@ try:
         df_flx = pd.DataFrame(rows_flx)
         st.dataframe(dcr_style(df_flx, "DCR"), use_container_width=True)
 
+    # ── TAB 5: Shear ──────────────────────────────────────────────────
     with tabs[5]:
         st.subheader("Shear Strength  —  Strength I  (β=2.0)")
         fig5 = go.Figure([
@@ -1686,6 +1918,7 @@ try:
         df_shr = pd.DataFrame(rows_shr)
         st.dataframe(dcr_style(df_shr, "DCR"), use_container_width=True)
 
+    # ── TAB 6: Summary ────────────────────────────────────────────────
     with tabs[6]:
         st.subheader("📋 Overall Design Summary")
         rows_sum = []
