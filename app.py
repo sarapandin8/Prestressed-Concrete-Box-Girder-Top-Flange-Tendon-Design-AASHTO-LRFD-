@@ -203,16 +203,17 @@ html, body, [class*="css"] {
     font-weight: 500!important;
 }
 
-/* ปุ่ม Upload - จิ้ม stBaseButton-secondary โดยตรง */
+/* ปุ่ม Upload - ทำให้เขียวทึบเหมือน Save Project */
 [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"],
 [data-testid="stSidebar"] button.st-emotion-cache-1dn7sub {
-    background: rgba(255,255,255,0.15)!important;
-    background-color: rgba(255,255,255,0.15)!important;
-    background-image: none!important;
+    background: linear-gradient(135deg, #1e6030 0%, #2d8a4a 100%)!important;
+    background-color: #1e6030!important;
+    background-image: linear-gradient(135deg, #1e6030 0%, #2d8a4a 100%)!important;
     color: #ffffff!important;
-    border: 1px solid rgba(255,255,255,0.3)!important;
+    border: 1px solid #2d8a4a!important;
     border-radius: 6px!important;
     box-shadow: none!important;
+    font-weight: 600!important;
 }
 
 /* เคลียร์ทุกอย่างข้างในปุ่มให้โปร่งใส */
@@ -224,12 +225,12 @@ html, body, [class*="css"] {
     color: #ffffff!important;
 }
 
-/* ตอน hover */
+/* ตอน hover ให้สว่างขึ้นเหมือน Save Project */
 [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"]:hover,
 [data-testid="stSidebar"] button.st-emotion-cache-1dn7sub:hover {
-    background: rgba(255,255,255,0.25)!important;
-    background-color: rgba(255,255,255,0.25)!important;
-    border-color: #ffffff!important;
+    background: linear-gradient(135deg, #2d8a4a 0%, #3ba55d 100%)!important;
+    background-color: #2d8a4a!important;
+    border-color: #4da6ff!important;
 }
 
 /* "Browse files" button inside dropzone */
