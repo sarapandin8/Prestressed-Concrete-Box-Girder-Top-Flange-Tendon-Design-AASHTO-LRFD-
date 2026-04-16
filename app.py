@@ -202,27 +202,29 @@ html, body, [class*="css"] {
     color: #ffffff!important;
     font-weight: 500!important;
 }
-
-/* ปุ่ม Upload ข้างใน - แก้ทั้ง button และ span */
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button,
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button span {
-    background-color: rgba(255,255,255,0.15)!important;
+/* ปุ่ม Upload ข้างใน - แบบทุบทั้งหมด */
+[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button {
     background: rgba(255,255,255,0.15)!important;
+    background-color: rgba(255,255,255,0.15)!important;
     color: #ffffff!important;
     border: 1px solid rgba(255,255,255,0.3)!important;
     border-radius: 6px!important;
+    box-shadow: none!important;
 }
 
-/* จิ้ม span ตัวการโดยตรง ใช้ class ที่แคปมา */
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] span.st-emotion-cache-epvm6 {
-    background-color: rgba(255,255,255,0.15)!important;
-    background: rgba(255,255,255,0.15)!important;
+/* บังคับทุกอย่างในปุ่มโปร่งใสให้หมด ไม่ว่าจะเป็น span div หรือ ::before */
+[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button *,
+[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button::before,
+[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button::after {
+    background: transparent!important;
+    background-color: transparent!important;
+    color: #ffffff!important;
 }
 
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button:hover,
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button:hover span {
-    background-color: rgba(255,255,255,0.25)!important;
+/* ตอน hover */
+[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button:hover {
     background: rgba(255,255,255,0.25)!important;
+    background-color: rgba(255,255,255,0.25)!important;
     border-color: #ffffff!important;
 }
 /* "Browse files" button inside dropzone */
