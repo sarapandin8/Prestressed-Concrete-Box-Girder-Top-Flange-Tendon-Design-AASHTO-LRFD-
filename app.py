@@ -227,6 +227,30 @@ html, body, [class*="css"] {
     background-color: rgba(255,255,255,0.25)!important;
     border-color: #ffffff!important;
 }
+
+/* ── เพิ่มบรรทัดนี้เข้าไปหลัง rule ปุ่ม button ที่มีอยู่แล้ว ── */
+
+/* BaseWeb inner layer ที่ทำให้ขาว */
+[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] [data-baseweb="button"] {
+    background: rgba(255,255,255,0.15) !important;
+    background-color: rgba(255,255,255,0.15) !important;
+}
+
+/* div ชั้นใน button ทุกชั้น */
+[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button > div,
+[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button > div > div {
+    background: transparent !important;
+    background-color: transparent !important;
+}
+
+/* บังคับ override class ที่ Streamlit generate (emotion cache) */
+[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button[kind="secondary"],
+[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button[kind="secondaryFormSubmit"] {
+    background: rgba(255,255,255,0.15) !important;
+    background-color: rgba(255,255,255,0.15) !important;
+    border: 1px solid rgba(255,255,255,0.4) !important;
+}
+
 /* "Browse files" button inside dropzone */
 [data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button {
     background-color: #1e3f6e !important;
