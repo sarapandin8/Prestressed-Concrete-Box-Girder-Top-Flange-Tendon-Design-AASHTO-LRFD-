@@ -202,53 +202,34 @@ html, body, [class*="css"] {
     color: #ffffff!important;
     font-weight: 500!important;
 }
-/* ปุ่ม Upload ข้างใน - แบบทุบทั้งหมด */
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button {
+
+/* ปุ่ม Upload - จิ้ม stBaseButton-secondary โดยตรง */
+[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"],
+[data-testid="stSidebar"] button.st-emotion-cache-1dn7sub {
     background: rgba(255,255,255,0.15)!important;
     background-color: rgba(255,255,255,0.15)!important;
+    background-image: none!important;
     color: #ffffff!important;
     border: 1px solid rgba(255,255,255,0.3)!important;
     border-radius: 6px!important;
     box-shadow: none!important;
 }
 
-/* บังคับทุกอย่างในปุ่มโปร่งใสให้หมด ไม่ว่าจะเป็น span div หรือ ::before */
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button *,
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button::before,
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button::after {
+/* เคลียร์ทุกอย่างข้างในปุ่มให้โปร่งใส */
+[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] *,
+[data-testid="stSidebar"] button.st-emotion-cache-1dn7sub * {
     background: transparent!important;
     background-color: transparent!important;
+    background-image: none!important;
     color: #ffffff!important;
 }
 
 /* ตอน hover */
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button:hover {
+[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"]:hover,
+[data-testid="stSidebar"] button.st-emotion-cache-1dn7sub:hover {
     background: rgba(255,255,255,0.25)!important;
     background-color: rgba(255,255,255,0.25)!important;
     border-color: #ffffff!important;
-}
-
-/* ── เพิ่มบรรทัดนี้เข้าไปหลัง rule ปุ่ม button ที่มีอยู่แล้ว ── */
-
-/* BaseWeb inner layer ที่ทำให้ขาว */
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] [data-baseweb="button"] {
-    background: rgba(255,255,255,0.15) !important;
-    background-color: rgba(255,255,255,0.15) !important;
-}
-
-/* div ชั้นใน button ทุกชั้น */
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button > div,
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button > div > div {
-    background: transparent !important;
-    background-color: transparent !important;
-}
-
-/* บังคับ override class ที่ Streamlit generate (emotion cache) */
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button[kind="secondary"],
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button[kind="secondaryFormSubmit"] {
-    background: rgba(255,255,255,0.15) !important;
-    background-color: rgba(255,255,255,0.15) !important;
-    border: 1px solid rgba(255,255,255,0.4) !important;
 }
 
 /* "Browse files" button inside dropzone */
