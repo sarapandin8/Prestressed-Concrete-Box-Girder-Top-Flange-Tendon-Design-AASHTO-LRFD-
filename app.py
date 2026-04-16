@@ -203,22 +203,28 @@ html, body, [class*="css"] {
     font-weight: 500!important;
 }
 
-/* ปุ่ม Upload ข้างใน */
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button {
+/* ปุ่ม Upload ข้างใน - แก้ทั้ง button และ span */
+[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button,
+[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button span {
     background-color: rgba(255,255,255,0.15)!important;
+    background: rgba(255,255,255,0.15)!important;
     color: #ffffff!important;
     border: 1px solid rgba(255,255,255,0.3)!important;
     border-radius: 6px!important;
 }
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button:hover {
-    background-color: rgba(255,255,255,0.25)!important;
-    border-color: #ffffff!important;
-}
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button:hover {
-    background-color: rgba(255,255,255,0.25)!important;
-    border-color: #ffffff!important;
+
+/* จิ้ม span ตัวการโดยตรง ใช้ class ที่แคปมา */
+[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] span.st-emotion-cache-epvm6 {
+    background-color: rgba(255,255,255,0.15)!important;
+    background: rgba(255,255,255,0.15)!important;
 }
 
+[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button:hover,
+[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button:hover span {
+    background-color: rgba(255,255,255,0.25)!important;
+    background: rgba(255,255,255,0.25)!important;
+    border-color: #ffffff!important;
+}
 /* "Browse files" button inside dropzone */
 [data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button {
     background-color: #1e3f6e !important;
