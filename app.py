@@ -174,32 +174,24 @@ html, body, [class*="css"] {
     letter-spacing: 0.02em !important;
     text-transform: uppercase !important;
 }
-/* Dropzone container - แก้เป็น Gradient เขียว */
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] {
+/* Dropzone container - แก้เป็น Gradient เขียว แบบแรงสุด */
+[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"],
+[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"]:hover {
     background: linear-gradient(135deg, #1e6030 0%, #2d8a4a 100%)!important;
     border: 2px dashed #2d5a8e!important;
     border-radius: 8px!important;
     padding: 12px!important;
 }
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"]:hover {
-    border-color: #4da6ff!important;
-    background: linear-gradient(135deg, #2d8a4a 0%, #3ba55d 100%)!important;
-}
 
-/* ทำให้ div ชั้นในโปร่งใส แก้ปัญหากล่องขาว */
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] > div {
-    background: transparent!important;
-    background-color: transparent!important;
-}
-
-/* ตัวหนังสือทั้งหมดเป็นสีขาว */
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] *,
+/* บังคับทุก element ข้างในให้โปร่งใสหมด ไม่สนว่าเป็นอะไร */
+[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] div,
+[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] section,
 [data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] span,
 [data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] p,
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] small,
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] div {
+[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] small {
+    background: transparent!important;
+    background-color: transparent!important;
     color: #ffffff!important;
-    font-weight: 500!important;
 }
 
 /* ปุ่ม Upload ข้างใน */
