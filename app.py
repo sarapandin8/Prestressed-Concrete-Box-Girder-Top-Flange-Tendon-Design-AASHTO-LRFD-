@@ -1603,11 +1603,11 @@ try:
         # ── Main area prominent export button ─────────────────────────
         st.markdown("""
         <div style="
-            background: linear-gradient(135deg, #451a03, #78350f, #92400e);
+            background: linear-gradient(135deg, #0f2040, #1a3355, #2d5a8e);
             border-radius: 12px;
             padding: 20px 24px;
             margin-bottom: 24px;
-            border: 2px solid #d97706;
+            border: 2px solid #2d5a8e;
             box-shadow: 0 4px 20px rgba(217,119,6,0.35);
             display: flex;
             align-items: center;
