@@ -177,13 +177,13 @@ html, body, [class*="css"] {
 
 /* Dropzone container */
 [data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] {
-    background-color: #0f2040 !important;
-    border: 2px dashed #2d5a8e !important;
-    border-radius: 8px !important;
+    background: linear-gradient(135deg, #1e6030 0%, #2d8a4a 100%)!important;
+    border: 2px dashed #2d5a8e!important;
+    border-radius: 8px!important;
 }
 [data-testid="stSidebar"] [data-testid="stFileUploadDropzone"]:hover {
-    border-color: #4da6ff !important;
-    background-color: #162d50 !important;
+    border-color: #4da6ff!important;
+    background: linear-gradient(135deg, #2d8a4a 0%, #3ba55d 100%)!important;
 }
 
 /* ALL text nodes inside dropzone */
