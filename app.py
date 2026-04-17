@@ -12,8 +12,9 @@ Changes from v3:
 Calculation logic: UNCHANGED from v3 fixed.
 """
 
-import math, datetime, json, os, base64
+import math, datetime, json
 from io import BytesIO
+
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -22,25 +23,16 @@ import streamlit as st
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from PIL import Image
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 1.  CONFIG & SESSION STATE INITIALIZATION
 # ─────────────────────────────────────────────────────────────────────────────
-
-# โหลดรูป box girder มาเป็นไอคอน
-# รูป Box Girder — ฝังเป็น base64 (ไม่ต้องพึ่ง path ภายนอก)
-_BOX_GIRDER_B64 = "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAAoAB4DASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD9U6j4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T+KqfEPiP4pZ1P4T
-from io import BytesIO as _BytesIO
-import base64 as _b64
-_img_bytes = _b64.b64decode(_BOX_GIRDER_B64)
-box_girder_icon = Image.open(_BytesIO(_img_bytes))
-_IMG_BYTES = _img_bytes
-
 st.set_page_config(
     layout="wide",
     page_title="PSC Box Girder — Top Flange Design",
-    page_icon=box_girder_icon,
+    page_icon="🏗️",
 )
+
 # ─────────────────────────────────────────────────────────────────────────────
 # CUSTOM CSS — Navy Sidebar + High-Contrast UI
 # ─────────────────────────────────────────────────────────────────────────────
@@ -483,10 +475,6 @@ if "_loaded_hash" not in st.session_state:
 # 2.  SIDEBAR
 # ─────────────────────────────────────────────────────────────────────────────
 with st.sidebar:
-    # แสดงรูป Box Girder ในหน้าแอป
-    from io import BytesIO as _SIO
-    st.image(_SIO(_IMG_BYTES), use_container_width=True)
-
     # Logo / Header
     st.markdown("""
     <div style="
@@ -2080,3 +2068,44 @@ try:
 except Exception as err:
     st.error(f"Calculation error: {err}")
     raise
+
+import tkinter as tk
+
+root = tk.Tk()
+root.title("Box Girder Cross Section")
+canvas = tk.Canvas(root, width=800, height=400, bg='white')
+canvas.pack()
+
+# สีเหลืองเหมือนในรูป
+yellow = "#FFD700"
+
+# วาดปีกบน + ผนัง + ปีกล่าง เป็นรูปเดียวกัน
+points_outer = [
+    50,100,   # ปลายปีกซ้ายบน
+    150,100,  # เริ่มเอียง
+    180,80,   # มุมบนซ้าย
+    620,80,   # มุมบนขวา
+    650,100,  # เริ่มเอียงขวา
+    750,100,  # ปลายปีกขวาบน
+    750,120,  # ปลายปีกขวาล่าง
+    630,120,  # มุมล่างขวาปีก
+    600,280,  # มุมล่างขวาคาน
+    200,280,  # มุมล่างซ้ายคาน
+    170,120,  # มุมล่างซ้ายปีก
+    50,120    # ปลายปีกซ้ายล่าง
+]
+
+# วาดช่องว่างตรงกลาง
+points_inner = [
+    220,140,  # มุมบนซ้ายรู
+    250,260,  # มุมล่างซ้ายรู
+    550,260,  # มุมล่างขวารู
+    580,140   # มุมบนขวารู
+]
+
+canvas.create_polygon(points_outer, fill=yellow, outline='black')
+canvas.create_polygon(points_inner, fill='white', outline='white')
+
+canvas.create_text(400, 320, text="Box Girder Cross Section", font=("Arial", 16))
+
+root.mainloop()
