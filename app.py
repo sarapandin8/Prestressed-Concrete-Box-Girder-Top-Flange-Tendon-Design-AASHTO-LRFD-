@@ -229,13 +229,35 @@ st.caption("AASHTO LRFD  |  1.0 m transverse strip  |  "
 c1, c2 = st.columns(2)
 with c1:
     st.subheader("📏 Flange Thickness t(x)")
-    # Pass src key (stable, never same object as widget key) → no reset → single input works
-    df_thk = st.data_editor(st.session_state["thk_src"], num_rows="dynamic", key="ed_thk")
+    df_thk = st.data_editor(
+        st.session_state["thk_src"], num_rows="dynamic", key="ed_thk",
+        column_config={
+            "x (m)":  st.column_config.NumberColumn("x (m)",  format="%.2f", step=0.01),
+            "t (m)":  st.column_config.NumberColumn("t (m)",  format="%.3f", step=0.001),
+        },
+    )
     st.subheader("🔩 Tendon Profile z(x)  [from top face]")
-    df_tdn = st.data_editor(st.session_state["tdn_src"], num_rows="dynamic", key="ed_tdn")
+    df_tdn = st.data_editor(
+        st.session_state["tdn_src"], num_rows="dynamic", key="ed_tdn",
+        column_config={
+            "x (m)":      st.column_config.NumberColumn("x (m)",      format="%.2f", step=0.01),
+            "z_top (m)":  st.column_config.NumberColumn("z_top (m)",  format="%.3f", step=0.001),
+        },
+    )
 with c2:
     st.subheader("📦 Loads per 1 m strip")
-    df_ld  = st.data_editor(st.session_state["ld_src"],  num_rows="dynamic", key="ed_ld")
+    df_ld = st.data_editor(
+        st.session_state["ld_src"], num_rows="dynamic", key="ed_ld",
+        column_config={
+            "x (m)":         st.column_config.NumberColumn("x (m)",         format="%.2f", step=0.01),
+            "M_DL (kNm/m)":  st.column_config.NumberColumn("M_DL (kNm/m)",  format="%.2f", step=0.01),
+            "V_DL (kN/m)":   st.column_config.NumberColumn("V_DL (kN/m)",   format="%.2f", step=0.01),
+            "M_SDL (kNm/m)": st.column_config.NumberColumn("M_SDL (kNm/m)", format="%.2f", step=0.01),
+            "V_SDL (kN/m)":  st.column_config.NumberColumn("V_SDL (kN/m)",  format="%.2f", step=0.01),
+            "M_LL (kNm/m)":  st.column_config.NumberColumn("M_LL (kNm/m)",  format="%.2f", step=0.01),
+            "V_LL (kN/m)":   st.column_config.NumberColumn("V_LL (kN/m)",   format="%.2f", step=0.01),
+        },
+    )
 # No sync-back: Streamlit forbids writing to widget key; data_editor manages ed_thk etc.
 
 # ─────────────────────────────────────────────────────────────────────────────
