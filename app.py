@@ -12,7 +12,7 @@ Changes from v3:
 Calculation logic: UNCHANGED from v3 fixed.
 """
 
-import math, datetime, json
+import math, datetime, json, os
 from io import BytesIO
 
 import numpy as np
@@ -30,8 +30,9 @@ from PIL import Image
 # ─────────────────────────────────────────────────────────────────────────────
 
 # โหลดรูป box girder มาเป็นไอคอน
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 try:
-    box_girder_icon = Image.open("image_7a2891.png")
+    box_girder_icon = Image.open(os.path.join(_BASE_DIR, "image_7a2891.png"))
 except FileNotFoundError:
     box_girder_icon = "🏗️"
 
@@ -482,6 +483,10 @@ if "_loaded_hash" not in st.session_state:
 # 2.  SIDEBAR
 # ─────────────────────────────────────────────────────────────────────────────
 with st.sidebar:
+    # แสดงรูป Box Girder ในหน้าแอป
+    if isinstance(box_girder_icon, Image.Image):
+        st.image(box_girder_icon, use_container_width=True)
+
     # Logo / Header
     st.markdown("""
     <div style="
