@@ -575,7 +575,7 @@ with st.sidebar:
         duct_dia_mm = st.number_input("Duct diameter (mm)",       min_value=20.0, key="duct_dia_mm")
 
     # ── Web Geometry ─────────────────────────────────────────────────────────
-    with st.expander("🌐  Web Geometry", expanded=True):
+    with st.expander("🟦  Web Geometry", expanded=True):
         st.caption("ระบุตำแหน่ง Centerline ของ Web ซ้าย-ขวา จากขอบซ้ายของ Flange")
         col_wl, col_wr = st.columns(2)
         cl_lweb = col_wl.number_input("CL. L.Web (m)", min_value=0.0, step=0.05, key="cl_lweb")
