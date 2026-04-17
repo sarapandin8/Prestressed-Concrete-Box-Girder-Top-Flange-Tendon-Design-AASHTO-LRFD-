@@ -63,9 +63,19 @@ for k, v in DEFAULT_SCALARS.items():
 #   - ed_thk  = widget internal state managed by Streamlit (never write to it)
 # This prevents StreamlitValueAssignmentNotAllowedError AND double-input issue
 _TABLE_SRC = {"thk_src": "df_thickness", "tdn_src": "df_tendon", "ld_src": "df_load"}
+
+def _make_float_df(data: dict) -> pd.DataFrame:
+    """Create DataFrame and force ALL columns to float64.
+    Prevents Streamlit data_editor from locking to integer-only input
+    when all default values happen to be whole numbers (0.00 -> int64 by pandas)."""
+    df = pd.DataFrame(data)
+    for col in df.columns:
+        df[col] = df[col].astype(float)
+    return df
+
 for src_key, tbl_key in _TABLE_SRC.items():
     if src_key not in st.session_state:
-        st.session_state[src_key] = pd.DataFrame(DEFAULT_TABLES[tbl_key])
+        st.session_state[src_key] = _make_float_df(DEFAULT_TABLES[tbl_key])
 
 if "_uploader_reset" not in st.session_state:
     st.session_state["_uploader_reset"] = 0
@@ -152,7 +162,7 @@ with st.sidebar:
                         if table_data:
                             new_df = pd.DataFrame(table_data)
                             for col in new_df.columns:
-                                new_df[col] = pd.to_numeric(new_df[col], errors="coerce")
+                                new_df[col] = pd.to_numeric(new_df[col], errors="coerce").astype(float)
                             st.session_state[src_key] = new_df
                 
                 # ลบ editor key state และข้อมูลที่แก้ไขค้างไว้ เพื่อให้ data_editor ดึงค่าใหม่จาก src_key
