@@ -268,16 +268,19 @@ with c2:
     df_ld = st.data_editor(
         st.session_state["ld_src"], num_rows="dynamic", key="ed_ld",
         column_config={
-            "x (m)":         st.column_config.NumberColumn("x (m)",         format="%.2f", step=0.01),
-            "M_DL (kNm/m)":  st.column_config.NumberColumn("M_DL (kNm/m)",  format="%.2f", step=0.01),
-            "V_DL (kN/m)":   st.column_config.NumberColumn("V_DL (kN/m)",   format="%.2f", step=0.01),
+            "x (m)": st.column_config.NumberColumn("x (m)", format="%.2f", step=0.01),
+            "M_DL (kNm/m)": st.column_config.NumberColumn("M_DL (kNm/m)", format="%.2f", step=0.01),
+            "V_DL (kN/m)": st.column_config.NumberColumn("V_DL (kN/m)", format="%.2f", step=0.01),
             "M_SDL (kNm/m)": st.column_config.NumberColumn("M_SDL (kNm/m)", format="%.2f", step=0.01),
-            "V_SDL (kN/m)":  st.column_config.NumberColumn("V_SDL (kN/m)",  format="%.2f", step=0.01),
-            "M_LL (kNm/m)":  st.column_config.NumberColumn("M_LL (kNm/m)",  format="%.2f", step=0.01),
-            "V_LL (kN/m)":   st.column_config.NumberColumn("V_LL (kN/m)",   format="%.2f", step=0.01),
+            "V_SDL (kN/m)": st.column_config.NumberColumn("V_SDL (kN/m)", format="%.2f", step=0.01),
+            "M_LL (kNm/m)": st.column_config.NumberColumn("M_LL (kNm/m)", format="%.2f", step=0.01),
+            "V_LL (kN/m)": st.column_config.NumberColumn("V_LL (kN/m)", format="%.2f", step=0.01),
         },
     )
-# No sync-back: Streamlit forbids writing to widget key; data_editor manages ed_thk etc.
+    # สำคัญ: sync กลับเข้า src และบังคับ float ทุกครั้ง
+    for col in df_ld.columns:
+        df_ld[col] = pd.to_numeric(df_ld[col], errors="coerce").astype(float)
+    st.session_state["ld_src"] = df_ld
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 4.  CALCULATION ENGINE
