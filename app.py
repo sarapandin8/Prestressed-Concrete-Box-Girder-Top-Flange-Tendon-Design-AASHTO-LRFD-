@@ -1,4 +1,3 @@
-Python
 """
 PSC Box Girder — Top Flange Transverse Design  (v4 — Navy UI Edition)
 AASHTO LRFD Bridge Design Specifications  |  1.0 m transverse strip
