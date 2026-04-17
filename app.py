@@ -30,7 +30,9 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 st.set_page_config(
     layout="wide",
     page_title="PSC Box Girder — Top Flange Design",
-    page_icon="🏗️",
+    from PIL import Image
+    box_girder_icon = Image.open("image_7a2891.png")  # โหลดรูปที่คุณเซฟไว้
+    page_icon=box_girder_icon,  # ใช้รูปแทนอีโมจิ 🏗️,
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
