@@ -1,3 +1,4 @@
+Python
 """
 PSC Box Girder — Top Flange Transverse Design  (v4 — Navy UI Edition)
 AASHTO LRFD Bridge Design Specifications  |  1.0 m transverse strip
@@ -23,18 +24,20 @@ import streamlit as st
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from PIL import Image  # ← บรรทัดนี้ต้องอยู่ตรงนี้ ไม่เยื้อง
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1.  CONFIG & SESSION STATE INITIALIZATION
 # ─────────────────────────────────────────────────────────────────────────────
+
+# โหลดรูป box girder มาเป็นไอคอน - ต้องวางไฟล์ image_7a2891.png ไว้โฟลเดอร์เดียวกับ app.py
+box_girder_icon = Image.open("image_7a2891.png")
+
 st.set_page_config(
     layout="wide",
     page_title="PSC Box Girder — Top Flange Design",
-    from PIL import Image
-    box_girder_icon = Image.open("image_7a2891.png")  # โหลดรูปที่คุณเซฟไว้
-    page_icon=box_girder_icon,  # ใช้รูปแทนอีโมจิ 🏗️,
-)
-
+    page_icon=box_girder_icon,  # ← ใส่ไอคอนรูปคานสีเหลือง
+)  # ← วงเล็บปิดต้องมี!
 # ─────────────────────────────────────────────────────────────────────────────
 # CUSTOM CSS — Navy Sidebar + High-Contrast UI
 # ─────────────────────────────────────────────────────────────────────────────
