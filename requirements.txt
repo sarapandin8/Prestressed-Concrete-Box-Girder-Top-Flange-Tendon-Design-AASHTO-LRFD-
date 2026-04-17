@@ -1,4 +1,5 @@
 streamlit>=1.20.0
+pillow
 plotly>=5.10.0
 pandas>=1.5.0
 numpy>=1.23.0
