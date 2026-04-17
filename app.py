@@ -30,11 +30,20 @@ from PIL import Image
 # ─────────────────────────────────────────────────────────────────────────────
 
 # โหลดรูป box girder มาเป็นไอคอน
-_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# หา path ของรูป Box Girder โดย fallback หลายวิธีเพื่อความ robust
+_IMG_NAME = "image_7a2891.png"
+_candidates = [
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), _IMG_NAME),
+    os.path.join(os.getcwd(), _IMG_NAME),
+    _IMG_NAME,
+]
+_IMG_PATH = next((p for p in _candidates if os.path.exists(p)), None)
+
 try:
-    box_girder_icon = Image.open(os.path.join(_BASE_DIR, "image_7a2891.png"))
-except FileNotFoundError:
+    box_girder_icon = Image.open(_IMG_PATH) if _IMG_PATH else "🏗️"
+except Exception:
     box_girder_icon = "🏗️"
+    _IMG_PATH = None
 
 st.set_page_config(
     layout="wide",
@@ -484,8 +493,8 @@ if "_loaded_hash" not in st.session_state:
 # ─────────────────────────────────────────────────────────────────────────────
 with st.sidebar:
     # แสดงรูป Box Girder ในหน้าแอป
-    if isinstance(box_girder_icon, Image.Image):
-        st.image(box_girder_icon, use_container_width=True)
+    if _IMG_PATH:
+        st.image(_IMG_PATH, use_container_width=True)
 
     # Logo / Header
     st.markdown("""
