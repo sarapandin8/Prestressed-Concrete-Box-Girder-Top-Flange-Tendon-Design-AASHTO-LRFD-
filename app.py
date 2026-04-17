@@ -33,9 +33,7 @@ DEFAULT_SCALARS = dict(
     fc=45.0, fci=36.0, fpu=1860.0, fpy_ratio=0.90,
     aps_strand=140.0, duct_dia_mm=70.0,
     num_tendon=1, n_strands=5,
-    fpi_ratio=0.75,
-    t0=3, RH=75,  # transfer age (days), relative humidity (%)
-    anch_slip_mm=6.0,
+    fpi_ratio=0.75, init_loss_pct=5, eff_ratio=0.80,
     phi_flex=1.00, phi_shear=0.90,
     proj_name="Box Girder Design", doc_no="CALC-STR-001",
     eng_name="Engineer Name", chk_name="Checker Name",
@@ -201,25 +199,11 @@ with st.sidebar:
 
     # ── 🔩 Prestressing Force ────────────────────────────────────────────────
     with st.expander("🔩 Prestressing Force", expanded=True):
-        num_tendon = st.number_input("Tendons per 1 m strip", min_value=1, key="num_tendon")
-        n_strands  = st.number_input("Strands per tendon",    min_value=1, key="n_strands")
-        fpi_ratio  = st.slider("Jacking stress  fpi/fpu", 0.70, 0.80, key="fpi_ratio",
-                               help="Standard = 0.75 fpu  (AASHTO 5.9.2.2)")
-
-    # ── 📉 Prestress Losses (AASHTO LRFD 5.9.3) ─────────────────────────────
-    with st.expander("📉 Prestress Loss Parameters", expanded=True):
-        st.caption("แอปคำนวณ Loss ตาม AASHTO LRFD 5.9.3 อัตโนมัติ")
-        t0_val       = st.number_input("Age at Transfer  t₀ (days)", min_value=1, key="t0",
-                                       help="อายุคอนกรีตขณะ Transfer (ปกติ 3–7 วัน)")
-        rh_val       = st.number_input("Relative Humidity  RH (%)", min_value=30,
-                                       max_value=100, key="RH",
-                                       help="ค่าความชื้นสัมพัทธ์เฉลี่ยของสภาพแวดล้อม")
-        anch_val     = st.number_input("Anchorage Slip  Δ (mm)", value=6.0, min_value=0.0,
-                                       key="anch_slip_mm", help="ค่ามาตรฐาน = 6 mm")
-        st.caption("ค่าคงที่มาตรฐาน (7-wire low-relax, internal grouted PT):")
-        st.markdown("- μ = 0.20, K = 0.0066 rad/m  *(AASHTO Table 5.9.3.2.1b-1)*")
-        st.markdown("- Ep = 197,000 MPa  *(AASHTO 5.4.4.2)*")
-        st.markdown("- Jacking: 0.75fpu, One-end")
+        num_tendon    = st.number_input("Tendons per 1 m strip",  min_value=1, key="num_tendon")
+        n_strands     = st.number_input("Strands per tendon",     min_value=1, key="n_strands")
+        fpi_ratio     = st.slider("fpi / fpu  (at jacking)",     0.70, 0.80, key="fpi_ratio")
+        init_loss_pct = st.slider("Immediate loss at Transfer (%)", 0, 15, key="init_loss_pct")
+        eff_ratio     = st.slider("Pe / Pi  (long-term ratio)",  0.50, 0.95, key="eff_ratio")
 
     # ── ⚖️ Resistance Factors ────────────────────────────────────────────────
     with st.expander("⚖️ Resistance Factors φ"):
@@ -254,207 +238,6 @@ with c2:
     df_ld  = st.data_editor(st.session_state["ld_src"],  num_rows="dynamic", key="ed_ld")
 # No sync-back: Streamlit forbids writing to widget key; data_editor manages ed_thk etc.
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# PRESTRESS LOSS ENGINE  (AASHTO LRFD 5.9.3)
-# ─────────────────────────────────────────────────────────────────────────────
-def calc_losses(dft, dfp, fc, fci, fpu, fpi_ratio, aps_strand,
-                num_tendon, n_strands, duct_dia_mm,
-                t0, RH, anch_slip_mm, width):
-    """
-    Prestress loss calculation per AASHTO LRFD 5.9.3.
-    Immediate: Friction (5.9.3.2.1) + Anchorage Set (5.9.3.2.2) + Elastic Shortening (5.9.3.2.3)
-    Long-term: Shrinkage + Creep (5.9.3.4) + Relaxation (5.9.3.4.3)
-    All stress in MPa. Geometry at midspan (representative section).
-    """
-    # ── Constants ──────────────────────────────────────────────────────────
-    Ep    = 197_000.0    # Modulus of elasticity of prestress steel (MPa) [AASHTO 5.4.4.2]
-    mu    = 0.20         # Friction coefficient (-) for grouted PT duct [AASHTO Table 5.9.3.2.1b-1]
-    K_wob = 0.0066       # Wobble coefficient (rad/m) for grouted duct
-    KL    = 45.0         # Relaxation factor (-) for low-relaxation strand [AASHTO 5.9.3.4.3c]
-    b     = 1.0          # Strip width (m)
-    wc    = 2400.0       # Unit weight of concrete (kg/m³) normal weight
-
-    # ── Section properties at midspan ─────────────────────────────────────
-    x_mid  = width / 2.0
-    t_mid  = float(np.interp(x_mid, dft["x (m)"], dft["t (m)"]))
-    z_mid  = float(np.interp(x_mid, dfp["x (m)"], dfp["z_top (m)"]))
-    yc_mid = t_mid / 2.0
-    e_mid  = yc_mid - z_mid    # Eccentricity (+: tendon above centroid) (m)
-
-    Ag_mid = b * t_mid                       # Gross cross-sectional area (m²/m)
-    Ig_mid = b * t_mid**3 / 12.0             # Gross moment of inertia (m⁴/m)
-    A_duct = math.pi / 4.0 * (duct_dia_mm / 1000.0)**2
-    n_duct = int(num_tendon)
-    y_duct = z_mid - yc_mid
-    An_mid = Ag_mid - n_duct * A_duct        # Net area after duct deduction (m²/m)
-    In_mid = Ig_mid - n_duct * A_duct * y_duct**2  # Net inertia (m⁴/m)
-    VS     = (b * t_mid) / (2.0 * (b + t_mid))     # Volume-to-Surface ratio (m)
-    VS_mm  = VS * 1000.0                             # V/S in mm
-
-    aps_m2  = aps_strand * 1e-6              # Area per strand (m²)
-    n_total = int(num_tendon * n_strands)
-    Aps     = n_total * aps_m2               # Total tendon area per 1m strip (m²/m)
-
-    # ── Modulus of elasticity of concrete (AASHTO 5.4.2.4) ────────────────
-    # Ec = 0.043 × wc^1.5 × √f'c  (MPa, wc in kg/m³)
-    Ec  = 0.043 * (wc**1.5) * math.sqrt(fc)    # At service (MPa)
-    Eci = 0.043 * (wc**1.5) * math.sqrt(fci)   # At transfer (MPa)
-
-    # ── Tendon geometry ────────────────────────────────────────────────────
-    # Angular change α = sum of absolute curvature changes along tendon (rad)
-    xs = dft["x (m)"].values.astype(float)
-    zs = np.interp(xs, dfp["x (m)"].values, dfp["z_top (m)"].values)
-    dz = np.diff(zs); dx = np.diff(xs)
-    dx_s = np.where(np.abs(dx) < 1e-9, 1e-9, dx)
-    alpha = float(np.sum(np.abs(np.diff(np.append([0], np.arctan(dz / dx_s))))))
-    alpha = max(alpha, 0.001)              # Minimum curvature 1 mrad
-    L_ten = float(np.sum(np.sqrt(dx**2 + dz**2)))   # Tendon length along profile (m)
-    if L_ten < 0.5: L_ten = float(xs[-1] - xs[0])
-
-    # ── Jacking parameters ─────────────────────────────────────────────────
-    fpj = fpu * fpi_ratio          # Jacking stress (MPa) = 0.75 fpu default
-    Pj  = Aps * fpj * 1e3          # Jacking force per 1m strip (kN/m)
-
-    # ══════════════════════════════════════════════════════════════════════
-    # SECTION A — IMMEDIATE LOSSES
-    # ══════════════════════════════════════════════════════════════════════
-
-    # ── A1. Friction Loss  ΔfpF  (AASHTO 5.9.3.2.1) ───────────────────────
-    # ΔfpF = fpj × (1 − e^(−μα − Kx))
-    # Evaluate at full length (dead end) and at midspan (representative)
-    exp_full = mu * alpha + K_wob * L_ten
-    delta_fpF_full = fpj * (1.0 - math.exp(-exp_full))  # loss at dead end
-    exp_mid  = mu * (alpha / 2.0) + K_wob * (L_ten / 2.0)
-    delta_fpF = fpj * (1.0 - math.exp(-exp_mid))         # loss at midspan (used)
-
-    # ── A2. Anchorage Set Loss  ΔfpA  (AASHTO 5.9.3.2.2) ──────────────────
-    # Friction loss slope (rate of friction loss per unit length) [MPa/m]:
-    # w = fpj × (μ × α/L + K)   [MPa/m]
-    # [FIX] correct slope uses angular change rate (α/L), not just fpj/L
-    friction_slope = fpj * (mu * alpha / L_ten + K_wob)   # MPa/m
-
-    # Anchor set influence length:
-    # Lpa = √(Δ_m × Ep_MPa / friction_slope_MPa_per_m)   → result in metres
-    # Unit check: √(m × MPa / (MPa/m)) = √(m²) = m  ✓
-    Lpa = math.sqrt((anch_slip_mm / 1000.0) * Ep / friction_slope)   # m  [FIX: no /1e3]
-    Lpa = min(Lpa, L_ten)
-
-    # Anchorage set stress loss at jacking end:
-    # ΔfpA = Δ_m × Ep_MPa / Lpa_m  [MPa]
-    delta_fpA = (anch_slip_mm / 1000.0) * Ep / Lpa
-    delta_fpA = min(delta_fpA, 0.20 * fpj)   # sanity cap 20% of fpj
-
-    # Stress in tendon at midspan after friction + anchor losses
-    # (anchor set affects tendon only within Lpa from jacking end)
-    fpt_mid = fpj - delta_fpF - (delta_fpA if Lpa > L_ten / 2.0 else 0.0)
-    fpt_mid = max(fpt_mid, 0.5 * fpj)
-
-    # ── A3. Elastic Shortening  ΔfpES  (AASHTO 5.9.3.2.3) ─────────────────
-    # fcgp = concrete stress at tendon CG level at transfer
-    # fcgp = Pi/An + Pi·e²/In   (compression positive for this term)
-    Pi_est = Aps * fpt_mid * 1e3           # Estimated Pi (kN/m)
-    fcgp   = (Pi_est/An_mid + Pi_est*e_mid**2/In_mid) / 1000.0  # MPa
-    # ΔfpES = (Ep/Eci) × fcgp
-    delta_fpES = (Ep / Eci) * fcgp
-    delta_fpES = max(0.0, delta_fpES)
-
-    # ── Immediate loss totals ──────────────────────────────────────────────
-    delta_imm   = delta_fpF + delta_fpA + delta_fpES
-    imm_loss_pct = delta_imm / fpj * 100.0
-
-    fpi_eff  = max(fpj - delta_imm, 0.5 * fpj)   # Effective stress after transfer
-    Pi_final = Aps * fpi_eff * 1e3                # Pi per 1m strip (kN/m)
-
-    # ══════════════════════════════════════════════════════════════════════
-    # SECTION B — LONG-TERM LOSSES  (AASHTO 5.9.3.4)
-    # ══════════════════════════════════════════════════════════════════════
-
-    # ── Correction factors ─────────────────────────────────────────────────
-    fci_ksi = fci / 6.895    # f'ci converted to ksi for AASHTO factor formulas
-
-    # kvs: Size factor for V/S ratio (AASHTO 5.4.2.3.2)
-    kvs = max(1.45 - 0.0052 * VS_mm, 1.0)    # V/S in mm
-
-    # khs: Humidity factor for shrinkage (AASHTO 5.4.2.3.3)
-    khs = max(2.00 - 0.014 * RH, 0.0)
-
-    # khc: Humidity factor for creep (AASHTO 5.4.2.3.2)
-    khc = max(1.56 - 0.008 * RH, 0.0)
-
-    # kf: Concrete strength factor — uses f'ci in ksi (AASHTO 5.4.2.3.2)
-    # [FIX] must use ksi, not MPa
-    kf = 5.0 / (1.0 + fci_ksi)
-
-    # ktd: Time development factor (t→∞ for final losses: ktd = 1)
-    ktd = 1.0
-
-    # ── B1. Shrinkage strain  εbdf  (AASHTO 5.4.2.3.3) ────────────────────
-    # εbdf = kvs × khs × kf × ktd × 0.48 × 10⁻³
-    eps_bdf = kvs * khs * kf * ktd * 0.48e-3   # Shrinkage strain (dimensionless)
-
-    # Shrinkage loss (AASHTO 5.9.3.4.2a-1):
-    # ΔfpSH = εbdf × Ep
-    delta_fpSH = eps_bdf * Ep                   # MPa
-
-    # ── B2. Creep coefficient  ψb  (AASHTO 5.4.2.3.2) ─────────────────────
-    ti_safe = max(float(t0), 1.0)
-    # ψb(t,ti) = 1.9 × kvs × khc × kf × ktd × ti^(−0.118)
-    psi_b = 1.9 * kvs * khc * kf * ktd * (ti_safe ** -0.118)
-
-    # Concrete stress at tendon CG at transfer  fcgp  (MPa)
-    fcgp_lt = (Pi_final/An_mid + Pi_final*e_mid**2/In_mid) / 1000.0  # MPa compression
-
-    # Creep loss (AASHTO 5.9.3.4.2b-1):
-    # ΔfpCR = (Ep/Ec) × fcgp × ψb
-    delta_fpCR = max((Ep / Ec) * fcgp_lt * psi_b, 0.0)   # MPa
-
-    # ── B3. Relaxation after transfer  ΔfpR2  (AASHTO 5.9.3.4.3c) ─────────
-    # For low-relaxation strand:
-    # ΔfpR2 = (fpt/KL) × (fpt/fpy − 0.55)  ≥ 0
-    fpy = fpu * fpi_ratio / fpi_ratio * 0.9   # yield = 0.9 fpu for low-relax
-    # fpt = stress after subtracting portion of long-term losses
-    fpt_r = fpi_eff - 0.3 * (delta_fpSH + delta_fpCR)
-    fpt_r = max(fpt_r, 0.5 * fpu)
-    delta_fpR = max((fpt_r / KL) * (fpt_r / fpy - 0.55), 0.0)   # MPa
-
-    # ── Long-term totals ───────────────────────────────────────────────────
-    delta_lt    = delta_fpSH + delta_fpCR + delta_fpR
-    lt_loss_pct = delta_lt / fpj * 100.0
-
-    # ── Final effective prestress ──────────────────────────────────────────
-    fpe_val  = max(fpi_eff - delta_lt, 0.45 * fpj)
-    Pe_final = Aps * fpe_val * 1e3    # Pe per 1m strip (kN/m)
-
-    return dict(
-        # Material
-        Ec=Ec, Eci=Eci, Ep=Ep,
-        # Section
-        t_mid=t_mid, z_mid=z_mid, e_mid=e_mid,
-        Ag_mid=Ag_mid, Ig_mid=Ig_mid, An_mid=An_mid, In_mid=In_mid,
-        VS=VS, VS_mm=VS_mm,
-        Aps=Aps, n_total=n_total,
-        # Tendon geometry
-        alpha=alpha, L_ten=L_ten, Lpa=Lpa, friction_slope=friction_slope,
-        # Jacking
-        fpj=fpj, Pj=Pj,
-        # Immediate losses
-        delta_fpF=delta_fpF, delta_fpF_full=delta_fpF_full,
-        delta_fpA=delta_fpA, delta_fpES=delta_fpES,
-        delta_imm=delta_imm, imm_loss_pct=imm_loss_pct,
-        fcgp=fcgp, fpt_mid=fpt_mid, Pi=Pi_final,
-        # Long-term factors
-        fci_ksi=fci_ksi, kvs=kvs, khs=khs, khc=khc, kf=kf, ktd=ktd,
-        psi_b=psi_b, eps_bdf=eps_bdf,
-        # Long-term losses
-        fcgp_lt=fcgp_lt, delta_fpSH=delta_fpSH,
-        delta_fpCR=delta_fpCR, delta_fpR=delta_fpR,
-        delta_lt=delta_lt, lt_loss_pct=lt_loss_pct,
-        fpi_eff=fpi_eff, fpe=fpe_val, Pe=Pe_final,
-        eff_ratio=Pe_final / Pj if Pj > 0 else 0.75,
-        total_loss_pct=(delta_imm + delta_lt) / fpj * 100.0,
-    )
-
 # ─────────────────────────────────────────────────────────────────────────────
 # 4.  CALCULATION ENGINE
 # ─────────────────────────────────────────────────────────────────────────────
@@ -467,7 +250,7 @@ def prep(df):
         return df
     return df.sort_values("x (m)").drop_duplicates(subset="x (m)").reset_index(drop=True)
 
-def run_calc(dft, dfp, dfl, L):
+def run_calc(dft, dfp, dfl):
     """Run all calculations and return results dict."""
     N = 500; b = 1.0
     x = np.linspace(0, width, N)
@@ -501,12 +284,13 @@ def run_calc(dft, dfp, dfl, L):
 
     e = yc - z  # eccentricity
 
-    # Prestress — use loss engine results (passed as argument)
-    n_total = L["n_total"]
-    Aps     = L["Aps"]
-    fpi_val = L["fpi_eff"]   # effective stress after immediate losses
-    Pi      = L["Pi"]
-    Pe      = L["Pe"]
+    # Prestress
+    aps_m2  = aps_strand * 1e-6
+    n_total = int(num_tendon * n_strands)
+    Aps     = n_total * aps_m2
+    fpi_val = fpu * fpi_ratio * (1.0 - init_loss_pct / 100.0)
+    Pi      = Aps * fpi_val * 1e3
+    Pe      = Pi * eff_ratio
 
     # Stress function
     def stress(P, M, ev, tv, Av, Iv):
@@ -560,7 +344,6 @@ def run_calc(dft, dfp, dfl, L):
 
     return dict(
         x=x, t=t, z=z, yc=yc, e=e,
-        L=L,
         Ag=Ag, Ig=Ig, An=An, In=In, y_duct=y_duct,
         n_total=n_total, Aps=Aps, fpi_val=fpi_val, Pi=Pi, Pe=Pe,
         beta1=beta1, k_fac=k_fac,
@@ -587,15 +370,7 @@ try:
     if any(len(d) < 2 for d in [dft, dfp, dfl]):
         st.warning("⚠️ Enter at least 2 rows in each table."); st.stop()
 
-    # Compute losses first, then pass to run_calc
-    t0_v   = int(st.session_state.get("t0", 3))
-    rh_v   = int(st.session_state.get("RH", 75))
-    anch_v = float(st.session_state.get("anch_slip_mm", 6.0))
-    L = calc_losses(dft, dfp,
-                    fc, fci, fpu, fpi_ratio, aps_strand,
-                    num_tendon, n_strands, duct_dia_mm,
-                    t0_v, rh_v, anch_v, width)
-    R = run_calc(dft, dfp, dfl, L)
+    R = run_calc(dft, dfp, dfl)
 
     # Station indices
     sta_x   = dfl["x (m)"].values
@@ -685,7 +460,7 @@ try:
             "Load combinations (AASHTO Table 3.4.1-1):",
             "  Strength I  :  1.25·DC + 1.50·DW + 1.75·LL",
             "  Service  I  :  1.00·DC + 1.00·DW + 1.00·LL  (compression check)",
-            "  Service III :  1.00·DC + 1.00·DW + 0.80·LL  (tension check)",
+            "  Service I   :  1.00·DC + 1.00·DW + 1.00·LL  (tension & compression check)",
             "  Transfer    :  Pi (after immediate losses) + M_DC",
             "Strand: Post-tensioned, bonded (fully grouted), low-relaxation",
             "Sign convention: Compression (−)  |  Tension (+)",
@@ -716,9 +491,8 @@ try:
             ["Total strands (1m strip)",  "n",       f"{R['n_total']}",          "—"],
             ["Total Aps (1m strip)",      "Aps",     f"{R['Aps']*1e6:.2f}",     "mm²/m"],
             ["Jacking stress ratio",      "fpi/fpu", f"{fpi_ratio:.4f}",         "—"],
-            ["Immediate loss (computed)",   "Δfi",    f"{R['L']['imm_loss_pct']:.2f}", "%"],
-            ["Long-term loss (computed)",   "ΔfLT",   f"{R['L']['lt_loss_pct']:.2f}",  "%"],
-            ["Total loss (computed)",       "Δftot",  f"{R['L']['total_loss_pct']:.2f}","%"],
+            ["Immediate loss",            "Δi",      f"{init_loss_pct:.1f}",     "%"],
+            ["Long-term effective ratio", "Pe/Pi",   f"{eff_ratio:.4f}",         "—"],
         ], cw=[5.5,2.5,2.5,2.0])
         blank()
 
@@ -733,9 +507,9 @@ try:
         tbl(["Condition","Expression","Limit (MPa)","Article"],[
             ["Transfer — Compression",         "−0.60·f'ci", f"{R['lim_tr_c']:.3f}","5.9.2.3.1a"],
             ["Transfer — Tension (bonded)",    "+0.62·√f'ci",f"+{R['lim_tr_t']:.4f}","5.9.2.3.1b"],
-            ["Service I — Comp (perm.loads)",  "−0.45·f'c",  f"{R['lim_sv_cp']:.3f}","5.9.2.3.2a"],
-            ["Service I — Comp (total loads)", "−0.60·f'c",  f"{R['lim_sv_ct']:.3f}","5.9.2.3.2a"],
-            ["Service III — Tension (bonded)", "+0.50·√f'c", f"+{R['lim_sv_t']:.4f}","5.9.2.3.2b"],
+            ["Service I — Compression (permanent loads)", "−0.45·f'c",  f"{R['lim_sv_cp']:.3f}","5.9.2.3.2a"],
+            ["Service I — Compression (total loads)",     "−0.60·f'c",  f"{R['lim_sv_ct']:.3f}","5.9.2.3.2a"],
+            ["Service I — Tension (bonded)",              "+0.50·√f'c", f"+{R['lim_sv_t']:.4f}","5.9.2.3.2b"],
         ], cw=[5.5,3.5,2.5,2.5])
         blank()
 
@@ -758,169 +532,9 @@ try:
         # ══════════════════════════════════════════════════════════════
         # SEC 3 — GLOBAL PRESTRESS
         # ══════════════════════════════════════════════════════════════
-        h1("3.  Prestress Loss Calculation  (AASHTO LRFD 5.9.3)")
+        h1("3.  Global Prestress Force Calculation")
 
-        _L = R["L"]
-        _fpj = _L["fpj"]
-
-        h2("3.1  Material Properties")
-        formula("Ec  =  0.043 × wc^1.5 × √f'c   [AASHTO 5.4.2.4]  (wc = 2400 kg/m³)")
-        subst( f"    =  0.043 × 2400^1.5 × √{fc:.1f}")
-        result(f"    =  {_L['Ec']:.2f} MPa")
-        blank()
-        formula("Eci =  0.043 × wc^1.5 × √f'ci")
-        subst( f"    =  0.043 × 2400^1.5 × √{fci:.1f}")
-        result(f"    =  {_L['Eci']:.2f} MPa")
-        blank()
-        para("Ep = 197,000 MPa  (AASHTO 5.4.4.2, standard)", indent=0.3)
-        blank()
-
-        h2("3.2  Section Properties at Midspan  (x = L/2)")
-        tbl(["Property","Value","Unit"],[
-            ["Slab thickness",            f"{_L['t_mid']*1000:.2f}", "mm"],
-            ["Tendon CG from top",         f"{_L['z_mid']*1000:.2f}", "mm"],
-            ["Eccentricity e = yc−z",      f"{_L['e_mid']*1000:.2f}", "mm"],
-            ["Gross area Ag",              f"{_L['Ag_mid']*1e6:.2f}", "mm²/m"],
-            ["Net area An (duct deducted)",f"{_L['An_mid']*1e6:.2f}", "mm²/m"],
-            ["Volume/Surface ratio",       f"{_L['VS_mm']:.2f}", "mm"],
-        ], cw=[6,4,2])
-        blank()
-
-        h2("3.3  Tendon Geometry")
-        formula("Angular change α:  computed from ∑|Δθ| along tendon profile")
-        result(f"  α  =  {_L['alpha']:.6f} rad")
-        blank()
-        formula("Tendon length:  L = ∑√(Δx²+Δz²)")
-        result(f"  L  =  {_L['L_ten']:.4f} m")
-        blank()
-        para(f"Jacking method: ONE-END  |  fpj = 0.75×fpu = 0.75×{fpu:.0f} = {_fpj:.2f} MPa",
-             indent=0.3)
-        blank()
-
-        h2("3.4  Immediate Losses")
-
-        h3("3.4.1  Friction Loss  ΔfpF  (AASHTO 5.9.3.2.1)")
-        para("Parameters: μ = 0.20, K = 0.0066 rad/m  (7-wire low-relax, internal grouted)",
-             italic=True, indent=0.3)
-        formula("ΔfpF  =  fpj × (1 − e^(−μα − Kx))")
-        subst( f"      =  {_fpj:.2f} × (1 − e^(−{0.20:.2f}×{_L['alpha']:.4f} − {0.0066:.4f}×{_L['L_ten']/2:.3f}))")
-        result(f"ΔfpF  =  {_L['delta_fpF']:.4f} MPa  ({_L['delta_fpF']/_fpj*100:.2f}% of fpj)")
-        blank()
-
-        h3("3.4.2  Anchorage Set Loss  ΔfpA  (AASHTO 5.9.3.2.2)")
-        anch_s = float(st.session_state.get("anch_slip_mm", 6.0))
-        formula("Length affected by anchor set:")
-        formula("  Lpa  =  √[ Δ·Ep / (μ·fpj/L + K) / 1000 ]")
-        subst( f"       =  √[ {anch_s:.1f}mm×197000 / ({0.20:.2f}×{_fpj:.2f}/{_L['L_ten']:.3f}+{0.0066:.4f}) / 1000 ]")
-        result(f"  Lpa  =  {_L['Lpa']:.4f} m")
-        blank()
-        formula("ΔfpA  =  Δ × Ep / Lpa")
-        subst( f"      =  {anch_s:.1f}mm × 197,000 MPa / {_L['Lpa']*1000:.2f}mm")
-        result(f"ΔfpA  =  {_L['delta_fpA']:.4f} MPa  ({_L['delta_fpA']/_fpj*100:.2f}% of fpj)")
-        blank()
-
-        h3("3.4.3  Elastic Shortening  ΔfpES  (AASHTO 5.9.3.2.3)")
-        formula("fcgp  =  (Pi/An + Pi·e²/In) / 1000   [concrete stress at tendon CG]")
-        Pi_v = float(_L["Pi"]); e_v = float(_L["e_mid"])
-        An_v = float(_L["An_mid"]); In_v = float(_L["In_mid"])
-        subst( f"      =  ({Pi_v:.4f}/{An_v*1e6:.2f}mm²  +  {Pi_v:.4f}×{e_v*1000:.2f}²mm²/{In_v*1e12:.4f}×10⁻³mm⁴) / 1000")
-        result(f"fcgp  =  {_L['fcgp']:.4f} MPa")
-        blank()
-        formula("ΔfpES  =  (Ep / Eci) × fcgp")
-        subst( f"       =  (197,000 / {_L['Eci']:.2f}) × {_L['fcgp']:.4f}")
-        result(f"ΔfpES  =  {_L['delta_fpES']:.4f} MPa  ({_L['delta_fpES']/_fpj*100:.2f}% of fpj)")
-        blank()
-
-        h3("3.4.4  Total Immediate Loss")
-        formula("Δfi  =  ΔfpF + ΔfpA + ΔfpES")
-        subst( f"     =  {_L['delta_fpF']:.4f} + {_L['delta_fpA']:.4f} + {_L['delta_fpES']:.4f}")
-        result(f"Δfi  =  {_L['delta_imm']:.4f} MPa  ({_L['imm_loss_pct']:.2f}% of fpj)")
-        blank()
-        formula("fpi (effective)  =  fpj − Δfi")
-        subst( f"                 =  {_fpj:.4f} − {_L['delta_imm']:.4f}")
-        result(f"fpi  =  {_L['fpi_eff']:.4f} MPa")
-        blank()
-        formula("Pi  =  Aps × fpi")
-        subst( f"    =  {_L['Aps']*1e6:.2f} mm²  ×  {_L['fpi_eff']:.4f} MPa  × 10⁻³")
-        result(f"Pi  =  {_L['Pi']:.4f} kN/m")
-        blank()
-
-        h2("3.5  Long-Term Losses  (Approximate Method, AASHTO 5.9.3.3)")
-        t0_v = int(st.session_state.get("t0", 3))
-        rh_v = int(st.session_state.get("RH", 75))
-        para(f"t₀ = {t0_v} days  |  RH = {rh_v}%  |  V/S = {_L['VS_mm']:.1f} mm",
-             italic=True, indent=0.3)
-        blank()
-
-        h3("3.5.1  Correction Factors")
-        formula("kvs  =  max(1.45 − 0.0052·V/S,  1.0)")
-        subst( f"     =  max(1.45 − 0.0052×{_L['VS_mm']:.2f},  1.0)")
-        result(f"kvs  =  {_L['kvs']:.4f}")
-        blank()
-        formula("khs  =  2.00 − 0.014·RH   (shrinkage humidity)")
-        subst( f"     =  2.00 − 0.014×{rh_v}")
-        result(f"khs  =  {_L['khs']:.4f}")
-        blank()
-        formula("khc  =  1.56 − 0.008·RH   (creep humidity)")
-        subst( f"     =  1.56 − 0.008×{rh_v}")
-        result(f"khc  =  {_L['khc']:.4f}")
-        blank()
-        formula("kf   =  5.0 / (1 + f'ci)")
-        subst( f"     =  5.0 / (1 + {fci:.1f})")
-        result(f"kf   =  {_L['kf']:.4f}")
-        blank()
-        formula("γh   =  1.7 − 0.01·RH")
-        subst( f"     =  1.7 − 0.01×{rh_v}")
-        result(f"γh   =  {_L['gamma_h']:.4f}")
-        blank()
-        formula("γst  =  5.0 / (1 + f'ci)")
-        result(f"γst  =  {_L['gamma_st']:.4f}")
-        blank()
-        formula("ψb (creep coeff.)  =  1.9·kvs·khc·kf·ktd·t₀^(−0.118)  [5.4.2.3.2]")
-        subst( f"                   =  1.9×{_L['kvs']:.4f}×{_L['khc']:.4f}×{_L['kf']:.4f}×1.0×{t0_v}^(−0.118)")
-        result(f"ψb  =  {_L['psi_b']:.4f}")
-        blank()
-
-        h3("3.5.2  Creep Loss  ΔfpCR  (AASHTO 5.9.3.3-1)")
-        formula("ΔfpCR  =  10.0 × (fpi·Aps/Ag) × γh × γst")
-        Ag_v = float(_L["Ag_mid"]); fpi_v = float(_L["fpi_eff"]); Aps_v = float(_L["Aps"])
-        subst( f"       =  10.0 × ({fpi_v:.2f}×{Aps_v*1e6:.2f}mm²/{Ag_v*1e6:.2f}mm²) × {_L['gamma_h']:.4f} × {_L['gamma_st']:.4f}")
-        result(f"ΔfpCR  =  {_L['delta_fpCR']:.4f} MPa")
-        blank()
-
-        h3("3.5.3  Shrinkage Loss  ΔfpSH  (AASHTO 5.9.3.3-1)")
-        formula("ΔfpSH  =  83 × γh × γst")
-        subst( f"       =  83 × {_L['gamma_h']:.4f} × {_L['gamma_st']:.4f}")
-        result(f"ΔfpSH  =  {_L['delta_fpSH']:.4f} MPa")
-        blank()
-
-        h3("3.5.4  Relaxation Loss  ΔfpR  (AASHTO 5.9.3.4.3, low-relax)")
-        formula("ΔfpR   =  0.3 × [20.0 − 0.4·ΔfpES − 0.2·(ΔfpCR + ΔfpSH)]")
-        subst( f"       =  0.3 × [20.0 − 0.4×{_L['delta_fpES']:.4f} − 0.2×({_L['delta_fpCR']:.4f}+{_L['delta_fpSH']:.4f})]")
-        result(f"ΔfpR   =  {_L['delta_fpR']:.4f} MPa")
-        blank()
-
-        h3("3.5.5  Total Long-Term Loss & Effective Prestress")
-        formula("ΔfLT   =  ΔfpCR + ΔfpSH + ΔfpR")
-        subst( f"       =  {_L['delta_fpCR']:.4f} + {_L['delta_fpSH']:.4f} + {_L['delta_fpR']:.4f}")
-        result(f"ΔfLT   =  {_L['delta_lt']:.4f} MPa  ({_L['lt_loss_pct']:.2f}% of fpi)")
-        blank()
-        formula("Δftotal  =  Δfi + ΔfLT")
-        subst( f"         =  {_L['delta_imm']:.4f} + {_L['delta_lt']:.4f}")
-        result(f"Δftotal  =  {_L['delta_imm']+_L['delta_lt']:.4f} MPa  ({_L['total_loss_pct']:.2f}% of fpj)")
-        blank()
-        formula("fpe  =  fpj − Δftotal")
-        subst( f"     =  {_fpj:.4f} − {_L['delta_imm']+_L['delta_lt']:.4f}")
-        result(f"fpe  =  {_L['fpe']:.4f} MPa")
-        blank()
-        formula("Pe   =  Aps × fpe")
-        subst( f"     =  {_L['Aps']*1e6:.2f} mm²  ×  {_L['fpe']:.4f} MPa  × 10⁻³")
-        result(f"Pe   =  {_L['Pe']:.4f} kN/m")
-        doc.add_page_break()
-
-        h1("4.  Global Prestress Force Summary")
-
-        h2("4.1  Total Prestress Steel Area  Aps")
+        h2("3.1  Total Prestress Steel Area  Aps")
         formula("Aps  =  n_total × asp")
         subst( f"     =  {R['n_total']} strands  ×  {aps_strand:.1f} mm²/strand")
         result(f"     =  {R['Aps']*1e6:.4f} mm²/m")
@@ -957,7 +571,7 @@ try:
         # ══════════════════════════════════════════════════════════════
         # SEC 4 — STATION-BY-STATION
         # ══════════════════════════════════════════════════════════════
-        h1("5.  Detailed Station-by-Station Calculations")
+        h1("4.  Detailed Station-by-Station Calculations")
         para("Calculations are presented per 1.0 m strip width at each station.", italic=True)
         blank()
 
@@ -1032,9 +646,6 @@ try:
                 ["Service I",
                  "Ms1 = M_DL + M_SDL + M_LL",
                  f"{mdi:.2f}+{msdi:.2f}+{mli:.2f}", f"{ms1i:.4f}","kNm/m"],
-                ["Service III",
-                 "Ms3 = M_DL + M_SDL + 0.8·M_LL",
-                 f"{mdi:.2f}+{msdi:.2f}+0.8×{mli:.2f}", f"{ms3i:.4f}","kNm/m"],
                 ["Strength I — Moment",
                  "Mu = 1.25·MDL + 1.50·MSDL + 1.75·MLL",
                  f"1.25×{mdi:.2f}+1.50×{msdi:.2f}+1.75×{mli:.2f}",
@@ -1081,10 +692,8 @@ try:
             blank()
 
             for (combo_name, M_i, t_s, b_s, note) in [
-                ("Service I  (compression check)",
-                 ms1i, s1t, s1b, "comp"),
-                ("Service III  (tension check)",
-                 ms3i, s3t, s3b, "tens"),
+                ("Service I  (compression & tension check)",
+                 ms1i, s1t, s1b, "both"),
             ]:
                 para(f"── {combo_name}  |  M = {M_i:.4f} kNm/m ──",
                      bold=True, indent=0.3)
@@ -1100,14 +709,19 @@ try:
                         f" − {R['Pe']:.4f}×{ei*1000:.4f}×{yci*1000:.4f}/{Igi*1e12:.6f}×10⁻³"
                         f" + {M_i:.4f}×{yci*1000:.4f}/{Igi*1e12:.6f}×10⁻³] × 10⁻³")
                 result(f"σ_bot  =  {b_s:.6f} MPa")
-                if note == "tens":
-                    pf(b_s >= -lsv_t,
-                       f"σ_bot = {b_s:.4f} MPa  ≥  {-lsv_t:.4f} MPa  (tension limit)",
-                       f"σ_bot = {b_s:.4f} MPa  <   {-lsv_t:.4f} MPa  TENSION EXCEEDED")
-                else:
-                    pf(b_s >= lsv_ct,
-                       f"σ_bot = {b_s:.4f} MPa  ≥  {lsv_ct:.3f} MPa  (−0.60·f'c)",
-                       f"σ_bot = {b_s:.4f} MPa  <   {lsv_ct:.3f} MPa  EXCEEDS LIMIT")
+                # Compression check (bottom)
+                pf(b_s >= lsv_ct,
+                   f"σ_bot = {b_s:.4f} MPa  ≥  {lsv_ct:.3f} MPa  (−0.60·f'c)",
+                   f"σ_bot = {b_s:.4f} MPa  <   {lsv_ct:.3f} MPa  EXCEEDS LIMIT")
+                # Tension check — both fibres (Service I)
+                blank()
+                para("  Tension check  (both fibres ≤ +0.50√f'c):", bold=True, indent=0.3)
+                pf(t_s <= lsv_t,
+                   f"σ_top = {t_s:.4f} MPa  ≤  +{lsv_t:.4f} MPa  (tension OK)",
+                   f"σ_top = {t_s:.4f} MPa  >  +{lsv_t:.4f} MPa  TENSION EXCEEDED")
+                pf(b_s <= lsv_t,
+                   f"σ_bot = {b_s:.4f} MPa  ≤  +{lsv_t:.4f} MPa  (tension OK)",
+                   f"σ_bot = {b_s:.4f} MPa  >  +{lsv_t:.4f} MPa  TENSION EXCEEDED")
                 blank()
 
             # 4.x.5  Flexural Strength
@@ -1240,7 +854,7 @@ try:
         # ══════════════════════════════════════════════════════════════
         # SEC 5 — SUMMARY
         # ══════════════════════════════════════════════════════════════
-        h1("6.  Summary of Results — All Stations")
+        h1("5.  Summary of Results — All Stations")
         sum_rows = []
         for i in sta_idx:
             mui_ = float(R["mu"][i]); vui_ = float(R["vu"][i])
@@ -1251,8 +865,10 @@ try:
             dcr_v = vui_/pVi_       if pVi_ > 0 else 999
             ok_tr = (R["lim_tr_c"]<=R["tr_top"][i]<=R["lim_tr_t"] and
                      R["lim_tr_c"]<=R["tr_bot"][i]<=R["lim_tr_t"])
-            ok_sv = (R["sv1_top"][i]>=R["lim_sv_ct"] and
-                     R["sv3_bot"][i]>=-R["lim_sv_t"])
+            ok_sv = (R["sv1_top"][i] >= R["lim_sv_ct"] and
+                     R["sv1_bot"][i] >= R["lim_sv_ct"] and
+                     R["sv1_top"][i] <= R["lim_sv_t"]  and
+                     R["sv1_bot"][i] <= R["lim_sv_t"])
             sum_rows.append([
                 f"{R['x'][i]:.2f}",
                 f"{R['tr_top'][i]:.3f}",  f"{R['tr_bot'][i]:.3f}",
@@ -1266,19 +882,21 @@ try:
             ])
         tbl(["x(m)",
              "σ_top Tr","σ_bot Tr","Transfer",
-             "σ_top Sv","σ_bot Sv","Service",
+             "σ_top SvcI","σ_bot SvcI","Service I",
              "Mu","φMn","DCR_M","Flexure",
              "Vu","φVn","DCR_V","Shear"],
             sum_rows,
-            cw=[1.2,1.6,1.6,1.4,1.6,1.6,1.4,1.6,1.6,1.4,1.4,1.6,1.6,1.4,1.4])
+            cw=[1.2,1.6,1.6,1.4,1.8,1.8,1.6,1.6,1.6,1.4,1.4,1.6,1.6,1.4,1.4])
         blank()
 
-        h1("7.  Conclusion")
+        h1("6.  Conclusion")
         all_pass = all(
             R["lim_tr_c"]<=R["tr_top"][i]<=R["lim_tr_t"] and
             R["lim_tr_c"]<=R["tr_bot"][i]<=R["lim_tr_t"] and
-            R["sv1_top"][i]>=R["lim_sv_ct"] and
-            R["sv3_bot"][i]>=-R["lim_sv_t"] and
+            R["sv1_top"][i] >= R["lim_sv_ct"] and
+            R["sv1_bot"][i] >= R["lim_sv_ct"] and
+            R["sv1_top"][i] <= R["lim_sv_t"]  and
+            R["sv1_bot"][i] <= R["lim_sv_t"]  and
             abs(float(R["mu"][i])) <= max(float(R["phi_Mn_pos"][i]),
                                           abs(float(R["phi_Mn_neg"][i]))) and
             float(R["vu"][i]) <= float(R["phi_Vn"][i])
@@ -1329,7 +947,6 @@ try:
 
     tabs = st.tabs([
         "📐 Geometry",
-        "📉 Prestress Losses",
         "🚀 Transfer Stress",
         "⚖️ Service Stress",
         "💪 Flexure (Envelope)",
@@ -1453,148 +1070,6 @@ try:
         c3.metric("Pe", f"{R['Pe']:.2f} kN/m")
 
     with tabs[1]:
-        # ── Prestress Losses Summary ────────────────────────────────────────
-        st.subheader("📉 Prestress Loss Summary  (AASHTO LRFD 5.9.3)")
-        _L = R["L"]
-        _fpj = _L["fpj"]
-
-        col_a, col_b, col_c = st.columns(3)
-        col_a.metric("Jacking Stress fpj",  f"{_fpj:.1f} MPa")
-        col_b.metric("Aps (1m strip)",       f"{_L['Aps']*1e6:.2f} mm²")
-        col_c.metric("Pj (per 1m strip)",    f"{_L['Pj']:.2f} kN/m")
-
-        st.markdown("---")
-        st.markdown("#### Immediate Losses")
-        _d = {
-            "Loss Component": [
-                "1. Friction  ΔfpF  (at midspan)",
-                "2. Anchorage Set  ΔfpA  (at jacking end)",
-                "3. Elastic Shortening  ΔfpES",
-                "Total Immediate  Δfi",
-            ],
-            "Formula  [AASHTO Ref.]": [
-                "fpj(1−e^(−μα−Kx))  [5.9.3.2.1]",
-                "Δ·Ep/Lpa  [5.9.3.2.2]",
-                "(Ep/Eci)·fcgp  [5.9.3.2.3]",
-                "ΔfpF + ΔfpA + ΔfpES",
-            ],
-            "Key Params": [
-                f"μ={0.20}, K={0.0066}, α={_L['alpha']:.4f}rad",
-                f"Δ={st.session_state.get('anch_slip_mm',6):.0f}mm, Lpa={_L['Lpa']:.2f}m (anchor influence length)",
-                f"fcgp={_L['fcgp']:.3f}MPa (concrete stress at tendon CG at transfer), Eci={_L['Eci']:.0f}MPa",
-                "",
-            ],
-            "Loss (MPa)": [
-                f"{_L['delta_fpF']:.2f}",
-                f"{_L['delta_fpA']:.2f}",
-                f"{_L['delta_fpES']:.2f}",
-                f"{_L['delta_imm']:.2f}",
-            ],
-            "% of fpj": [
-                f"{_L['delta_fpF']/_fpj*100:.2f}",
-                f"{_L['delta_fpA']/_fpj*100:.2f}",
-                f"{_L['delta_fpES']/_fpj*100:.2f}",
-                f"{_L['imm_loss_pct']:.2f}",
-            ],
-        }
-        st.dataframe(pd.DataFrame(_d), use_container_width=True)
-
-        col_x, col_y = st.columns(2)
-        col_x.metric("fpi (after imm. losses)", f"{_L['fpi_eff']:.1f} MPa")
-        col_y.metric("Pi (per 1m strip)",        f"{_L['Pi']:.2f} kN/m")
-
-        st.markdown("---")
-        st.markdown("#### Long-Term Losses  (Approximate Method)")
-        _d2 = {
-            "Loss Component": [
-                "4. Shrinkage  ΔfpSH",
-                "5. Creep  ΔfpCR",
-                "6. Relaxation  ΔfpR2",
-                "Total Long-term  ΔfLT",
-                "TOTAL LOSS  Δftotal",
-            ],
-            "Formula  [AASHTO Ref.]": [
-                "εbdf × Ep  [5.9.3.4.2a]",
-                "(Ep/Ec) × fcgp × ψb  [5.9.3.4.2b]",
-                "(fpt/KL)(fpt/fpy − 0.55)  [5.9.3.4.3c]",
-                "ΔfpSH + ΔfpCR + ΔfpR",
-                "Δfi + ΔfLT",
-            ],
-            "Key Params": [
-                f"εbdf={_L['eps_bdf']:.5f} (shrinkage strain), kvs={_L['kvs']:.3f} (V/S factor), khs={_L['khs']:.3f} (humidity factor for shrinkage), kf={_L['kf']:.3f} (strength factor)",
-                f"ψb={_L['psi_b']:.3f} (creep coefficient), fcgp={_L['fcgp_lt']:.3f}MPa (concrete stress at tendon CG), khc={_L['khc']:.3f} (humidity factor for creep)",
-                f"KL={45} (relaxation factor low-relax), fpt/fpy={_L['fpi_eff']/(_fpj*0.9):.3f}",
-                "", "",
-            ],
-            "Loss (MPa)": [
-                f"{_L['delta_fpSH']:.2f}",
-                f"{_L['delta_fpCR']:.2f}",
-                f"{_L['delta_fpR']:.2f}",
-                f"{_L['delta_lt']:.2f}",
-                f"{_L['delta_imm']+_L['delta_lt']:.2f}",
-            ],
-            "% of fpj": [
-                f"{_L['delta_fpSH']/_fpj*100:.2f}",
-                f"{_L['delta_fpCR']/_fpj*100:.2f}",
-                f"{_L['delta_fpR']/_fpj*100:.2f}",
-                f"{_L['lt_loss_pct']:.2f}",
-                f"{_L['total_loss_pct']:.2f}",
-            ],
-        }
-        st.dataframe(pd.DataFrame(_d2), use_container_width=True)
-
-        col_p, col_q, col_r = st.columns(3)
-        col_p.metric("fpe (effective)", f"{_L['fpe']:.1f} MPa",
-                     delta=f"{_L['fpe']/_fpj*100:.1f}% of fpj")
-        col_q.metric("Pe (per 1m strip)", f"{_L['Pe']:.2f} kN/m")
-        col_r.metric("Total Loss", f"{_L['total_loss_pct']:.2f}%",
-                     delta=f"{_L['fpe']:.0f} MPa remaining")
-
-        st.markdown("---")
-        st.markdown("#### Key Factors Used")
-        _factors = {
-            "Parameter (description)": [
-                "Ec  (modulus of elasticity of concrete at service)",
-                "Eci  (modulus of elasticity of concrete at transfer)",
-                "Ep  (modulus of elasticity of prestress steel)",
-                "μ  (friction coefficient, grouted duct)",
-                "K  (wobble coefficient, grouted duct)",
-                "α  (total angular change of tendon)",
-                "L  (tendon length along profile)",
-                "friction slope  (rate of friction loss per unit length)",
-                "Lpa  (anchor set influence length)",
-                "Δ  (anchorage slip)",
-                "V/S  (volume-to-surface ratio)",
-                "kvs  (V/S size factor for shrinkage/creep)",
-                "khs  (humidity factor for shrinkage)",
-                "khc  (humidity factor for creep)",
-                "kf  (concrete strength factor, uses f'ci in ksi)",
-                "ψb  (creep coefficient)",
-                "εbdf  (shrinkage strain)",
-            ],
-            "Value  [Unit]": [
-                f"{_L['Ec']:.0f} MPa",
-                f"{_L['Eci']:.0f} MPa",
-                "197,000 MPa",
-                "0.20  [-]",
-                "0.0066 rad/m",
-                f"{_L['alpha']:.4f} rad",
-                f"{_L['L_ten']:.3f} m",
-                f"{_L['friction_slope']:.4f} MPa/m",
-                f"{_L['Lpa']:.3f} m",
-                f"{st.session_state.get('anch_slip_mm', 6.0):.1f} mm",
-                f"{_L['VS_mm']:.1f} mm",
-                f"{_L['kvs']:.4f}",
-                f"{_L['khs']:.4f}",
-                f"{_L['khc']:.4f}",
-                f"{_L['kf']:.4f}  (f'ci_ksi = {_L['fci_ksi']:.3f} ksi)",
-                f"{_L['psi_b']:.4f}",
-                f"{_L['eps_bdf']:.6f}",
-            ],
-        }
-        st.dataframe(pd.DataFrame(_factors), use_container_width=True)
-
-    with tabs[2]:
         st.subheader("Stress Check — Transfer  (Pi + M_DL  |  Net section)")
         fig2 = go.Figure([
             go.Scatter(x=R["x"], y=R["tr_top"], name="Top",    line_color="red"),
@@ -1614,33 +1089,33 @@ try:
                    for i in sta_idx]
         st.dataframe(pd.DataFrame(rows_tr), use_container_width=True)
 
-    with tabs[3]:
-        st.subheader("Stress Check — Service  (Pe + loads  |  Gross section)")
-        fig3 = make_subplots(1, 2,
-                             subplot_titles=("Service I — Compression", "Service III — Tension"))
-        for col_n, (tops, bots) in enumerate(
-            [(R["sv1_top"], R["sv1_bot"]), (R["sv3_top"], R["sv3_bot"])], 1
-        ):
-            fig3.add_trace(go.Scatter(x=R["x"], y=tops, name="Top", line_color="red"),  1, col_n)
-            fig3.add_trace(go.Scatter(x=R["x"], y=bots, name="Bot", line_color="blue"), 1, col_n)
-            fig3.add_hline(y=R["lim_sv_ct"], row=1, col=col_n,
-                           line_dash="dash", line_color="orange")
-            fig3.add_hline(y=-R["lim_sv_t"], row=1, col=col_n,
-                           line_dash="dot",  line_color="green")
-        fig3.update_layout(height=380)
+    with tabs[2]:
+        st.subheader("Stress Check — Service I  (Pe + Ms1  |  Gross section)")
+        fig3 = go.Figure([
+            go.Scatter(x=R["x"], y=R["sv1_top"], name="Top", line_color="red"),
+            go.Scatter(x=R["x"], y=R["sv1_bot"], name="Bottom", line_color="blue"),
+        ])
+        fig3.add_hline(y=R["lim_sv_ct"], line_dash="dash", line_color="orange",
+                       annotation_text=f"−0.60f'c = {R['lim_sv_ct']:.2f} MPa")
+        fig3.add_hline(y=R["lim_sv_cp"], line_dash="dot",  line_color="orange",
+                       annotation_text=f"−0.45f'c = {R['lim_sv_cp']:.2f} MPa")
+        fig3.add_hline(y=R["lim_sv_t"],  line_dash="dash", line_color="green",
+                       annotation_text=f"+0.50√f'c = +{R['lim_sv_t']:.3f} MPa")
+        fig3.update_layout(height=380, xaxis_title="x (m)", yaxis_title="Stress (MPa)")
         st.plotly_chart(fig3, use_container_width=True)
-        rows_sv = [{"x (m)": f"{R['x'][i]:.2f}",
-                    "σ_top SvcI":   f"{R['sv1_top'][i]:.4f}",
-                    "σ_bot SvcI":   f"{R['sv1_bot'][i]:.4f}",
-                    "σ_top SvcIII": f"{R['sv3_top'][i]:.4f}",
-                    "σ_bot SvcIII": f"{R['sv3_bot'][i]:.4f}",
-                    "Status": "✅" if (R["sv1_top"][i]>=R["lim_sv_ct"] and
-                                       R["sv1_bot"][i]>=R["lim_sv_ct"] and
-                                       R["sv3_bot"][i]>=-R["lim_sv_t"]) else "❌"}
+        rows_sv = [{"x (m)":        f"{R['x'][i]:.2f}",
+                    "σ_top (MPa)":  f"{R['sv1_top'][i]:.4f}",
+                    "σ_bot (MPa)":  f"{R['sv1_bot'][i]:.4f}",
+                    "Comp. Limit":  f"{R['lim_sv_ct']:.2f}",
+                    "Tens. Limit":  f"+{R['lim_sv_t']:.3f}",
+                    "Status": "✅" if (R["sv1_top"][i] >= R["lim_sv_ct"] and
+                                       R["sv1_bot"][i] >= R["lim_sv_ct"] and
+                                       R["sv1_top"][i] <= R["lim_sv_t"]  and
+                                       R["sv1_bot"][i] <= R["lim_sv_t"]) else "❌"}
                    for i in sta_idx]
         st.dataframe(pd.DataFrame(rows_sv), use_container_width=True)
 
-    with tabs[4]:
+    with tabs[3]:
         st.subheader("Flexural Strength Envelope  —  Strength I")
         fig4 = go.Figure()
         fig4.add_trace(go.Scatter(x=R["x"], y=R["phi_Mn_pos"], name="+φMn",
@@ -1667,7 +1142,7 @@ try:
         df_flx = pd.DataFrame(rows_flx)
         st.dataframe(dcr_style(df_flx, "DCR"), use_container_width=True)
 
-    with tabs[5]:
+    with tabs[4]:
         st.subheader("Shear Strength  —  Strength I  (β=2.0)")
         fig5 = go.Figure([
             go.Scatter(x=R["x"], y=R["phi_Vn"], name="φVn",
@@ -1691,7 +1166,7 @@ try:
         df_shr = pd.DataFrame(rows_shr)
         st.dataframe(dcr_style(df_shr, "DCR"), use_container_width=True)
 
-    with tabs[6]:
+    with tabs[5]:
         st.subheader("📋 Overall Design Summary")
         rows_sum = []
         for i in sta_idx:
@@ -1701,8 +1176,10 @@ try:
             pVi_= float(R["phi_Vn"][i])
             ok_tr = (R["lim_tr_c"]<=R["tr_top"][i]<=R["lim_tr_t"] and
                      R["lim_tr_c"]<=R["tr_bot"][i]<=R["lim_tr_t"])
-            ok_sv = (R["sv1_top"][i]>=R["lim_sv_ct"] and
-                     R["sv3_bot"][i]>=-R["lim_sv_t"])
+            ok_sv = (R["sv1_top"][i] >= R["lim_sv_ct"] and
+                     R["sv1_bot"][i] >= R["lim_sv_ct"] and
+                     R["sv1_top"][i] <= R["lim_sv_t"]  and
+                     R["sv1_bot"][i] <= R["lim_sv_t"])
             dcr_m = abs(mui_)/cap   if cap >0 else 999
             dcr_v = vui_/pVi_       if pVi_>0 else 999
             rows_sum.append({
