@@ -251,18 +251,31 @@ with c1:
     df_thk = st.data_editor(
         st.session_state["thk_src"], num_rows="dynamic", key="ed_thk",
         column_config={
-            "x (m)":  st.column_config.NumberColumn("x (m)",  format="%.2f", step=0.01),
-            "t (m)":  st.column_config.NumberColumn("t (m)",  format="%.3f", step=0.001),
+            "x (m)": st.column_config.NumberColumn("x (m)", format="%.2f", step=0.01),
+            "t (m)": st.column_config.NumberColumn("t (m)", format="%.3f", step=0.001),
         },
     )
-    st.subheader("🔩 Tendon Profile z(x)  [from top face]")
+    # sync กลับ + บังคับ float + ลบ widget state ทิ้ง
+    for col in df_thk.columns:
+        df_thk[col] = pd.to_numeric(df_thk[col], errors="coerce").astype(float)
+    st.session_state["thk_src"] = df_thk
+    if "ed_thk" in st.session_state: # ลบบรรทัดนี้สำคัญมาก
+        del st.session_state["ed_thk"]
+
+    st.subheader("🔩 Tendon Profile z(x) [from top face]")
     df_tdn = st.data_editor(
         st.session_state["tdn_src"], num_rows="dynamic", key="ed_tdn",
         column_config={
-            "x (m)":      st.column_config.NumberColumn("x (m)",      format="%.2f", step=0.01),
-            "z_top (m)":  st.column_config.NumberColumn("z_top (m)",  format="%.3f", step=0.001),
+            "x (m)": st.column_config.NumberColumn("x (m)", format="%.2f", step=0.01),
+            "z_top (m)": st.column_config.NumberColumn("z_top (m)", format="%.3f", step=0.001),
         },
     )
+    for col in df_tdn.columns:
+        df_tdn[col] = pd.to_numeric(df_tdn[col], errors="coerce").astype(float)
+    st.session_state["tdn_src"] = df_tdn
+    if "ed_tdn" in st.session_state:
+        del st.session_state["ed_tdn"]
+
 with c2:
     st.subheader("📦 Loads per 1 m strip")
     df_ld = st.data_editor(
@@ -277,11 +290,11 @@ with c2:
             "V_LL (kN/m)": st.column_config.NumberColumn("V_LL (kN/m)", format="%.2f", step=0.01),
         },
     )
-    # สำคัญ: sync กลับเข้า src และบังคับ float ทุกครั้ง
     for col in df_ld.columns:
         df_ld[col] = pd.to_numeric(df_ld[col], errors="coerce").astype(float)
     st.session_state["ld_src"] = df_ld
-
+    if "ed_ld" in st.session_state: # บรรทัดนี้คือตัวแก้
+        del st.session_state["ed_ld"]
 # ─────────────────────────────────────────────────────────────────────────────
 # 4.  CALCULATION ENGINE
 # ─────────────────────────────────────────────────────────────────────────────
