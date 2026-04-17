@@ -174,63 +174,26 @@ html, body, [class*="css"] {
     letter-spacing: 0.02em !important;
     text-transform: uppercase !important;
 }
-/* Dropzone container - แก้ Gradient เขียว + ทุบ section ขาว */
+
+/* Dropzone container */
 [data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] {
     background: linear-gradient(135deg, #1e6030 0%, #2d8a4a 100%)!important;
     border: 2px dashed #2d5a8e!important;
     border-radius: 8px!important;
-    padding: 12px!important;
 }
 [data-testid="stSidebar"] [data-testid="stFileUploadDropzone"]:hover {
     border-color: #4da6ff!important;
     background: linear-gradient(135deg, #2d8a4a 0%, #3ba55d 100%)!important;
 }
 
-/* ตัวการ: section ข้างในที่พื้นขาว จับทำให้โปร่งใส */
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] section.st-emotion-cache-nd5v17,
-[data-testid="stSidebar"] section[data-testid="stFileUploaderDropzone"] {
-    background: transparent!important;
-    background-color: transparent!important;
-}
-
-/* ตัวหนังสือทั้งหมดเป็นสีขาว */
+/* ALL text nodes inside dropzone */
 [data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] *,
 [data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] span,
 [data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] p,
 [data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] small,
 [data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] div {
-    color: #ffffff!important;
-    font-weight: 500!important;
-}
-
-/* ปุ่ม Upload - ทำให้เขียวทึบเหมือน Save Project */
-[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"],
-[data-testid="stSidebar"] button.st-emotion-cache-1dn7sub {
-    background: linear-gradient(135deg, #1e6030 0%, #2d8a4a 100%)!important;
-    background-color: #1e6030!important;
-    background-image: linear-gradient(135deg, #1e6030 0%, #2d8a4a 100%)!important;
-    color: #ffffff!important;
-    border: 1px solid #2d8a4a!important;
-    border-radius: 6px!important;
-    box-shadow: none!important;
-    font-weight: 600!important;
-}
-
-/* เคลียร์ทุกอย่างข้างในปุ่มให้โปร่งใส */
-[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] *,
-[data-testid="stSidebar"] button.st-emotion-cache-1dn7sub * {
-    background: transparent!important;
-    background-color: transparent!important;
-    background-image: none!important;
-    color: #ffffff!important;
-}
-
-/* ตอน hover ให้สว่างขึ้นเหมือน Save Project */
-[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"]:hover,
-[data-testid="stSidebar"] button.st-emotion-cache-1dn7sub:hover {
-    background: linear-gradient(135deg, #2d8a4a 0%, #3ba55d 100%)!important;
-    background-color: #2d8a4a!important;
-    border-color: #4da6ff!important;
+    color: #93c5fd !important;
+    font-weight: 500 !important;
 }
 
 /* "Browse files" button inside dropzone */
@@ -575,7 +538,7 @@ with st.sidebar:
         duct_dia_mm = st.number_input("Duct diameter (mm)",       min_value=20.0, key="duct_dia_mm")
 
     # ── Web Geometry ─────────────────────────────────────────────────────────
-    with st.expander("🟦  Web Geometry", expanded=True):
+    with st.expander("🌐  Web Geometry", expanded=True):
         st.caption("ระบุตำแหน่ง Centerline ของ Web ซ้าย-ขวา จากขอบซ้ายของ Flange")
         col_wl, col_wr = st.columns(2)
         cl_lweb = col_wl.number_input("CL. L.Web (m)", min_value=0.0, step=0.05, key="cl_lweb")
@@ -1603,11 +1566,11 @@ try:
         # ── Main area prominent export button ─────────────────────────
         st.markdown("""
         <div style="
-            background: linear-gradient(135deg, #0f2040, #1a3355, #2d5a8e);
+            background: linear-gradient(135deg, #451a03, #78350f, #92400e);
             border-radius: 12px;
             padding: 20px 24px;
             margin-bottom: 24px;
-            border: 2px solid #2d5a8e;
+            border: 2px solid #d97706;
             box-shadow: 0 4px 20px rgba(217,119,6,0.35);
             display: flex;
             align-items: center;
@@ -2068,44 +2031,3 @@ try:
 except Exception as err:
     st.error(f"Calculation error: {err}")
     raise
-
-import tkinter as tk
-
-root = tk.Tk()
-root.title("Box Girder Cross Section")
-canvas = tk.Canvas(root, width=800, height=400, bg='white')
-canvas.pack()
-
-# สีเหลืองเหมือนในรูป
-yellow = "#FFD700"
-
-# วาดปีกบน + ผนัง + ปีกล่าง เป็นรูปเดียวกัน
-points_outer = [
-    50,100,   # ปลายปีกซ้ายบน
-    150,100,  # เริ่มเอียง
-    180,80,   # มุมบนซ้าย
-    620,80,   # มุมบนขวา
-    650,100,  # เริ่มเอียงขวา
-    750,100,  # ปลายปีกขวาบน
-    750,120,  # ปลายปีกขวาล่าง
-    630,120,  # มุมล่างขวาปีก
-    600,280,  # มุมล่างขวาคาน
-    200,280,  # มุมล่างซ้ายคาน
-    170,120,  # มุมล่างซ้ายปีก
-    50,120    # ปลายปีกซ้ายล่าง
-]
-
-# วาดช่องว่างตรงกลาง
-points_inner = [
-    220,140,  # มุมบนซ้ายรู
-    250,260,  # มุมล่างซ้ายรู
-    550,260,  # มุมล่างขวารู
-    580,140   # มุมบนขวารู
-]
-
-canvas.create_polygon(points_outer, fill=yellow, outline='black')
-canvas.create_polygon(points_inner, fill='white', outline='white')
-
-canvas.create_text(400, 320, text="Box Girder Cross Section", font=("Arial", 16))
-
-root.mainloop()
