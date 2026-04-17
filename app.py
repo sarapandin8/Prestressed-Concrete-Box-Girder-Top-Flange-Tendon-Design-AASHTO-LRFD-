@@ -12,9 +12,8 @@ Changes from v3:
 Calculation logic: UNCHANGED from v3 fixed.
 """
 
-import math, datetime, json, os
+import math, datetime, json, os, base64
 from io import BytesIO
-
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -24,7 +23,6 @@ from docx import Document
 from docx.shared import Inches, Pt, RGBColor, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from PIL import Image
-
 # ─────────────────────────────────────────────────────────────────────────────
 # 1.  CONFIG & SESSION STATE INITIALIZATION
 # ─────────────────────────────────────────────────────────────────────────────
