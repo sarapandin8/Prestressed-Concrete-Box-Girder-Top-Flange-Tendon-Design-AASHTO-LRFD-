@@ -162,84 +162,15 @@ html, body, [class*="css"] {
     background-color: #2d5a8e !important;
 }
 
-/* ── Sidebar file uploader — full navy theme ── */
-
-/* Label above the dropzone */
-[data-testid="stSidebar"] [data-testid="stFileUploaderLabel"],
-[data-testid="stSidebar"] .stFileUploader label,
-[data-testid="stSidebar"] .stFileUploader > label {
-    color: #93c5fd !important;
-    font-size: 0.78rem !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.02em !important;
-    text-transform: uppercase !important;
-}
-
-/* Dropzone container */
+/* Sidebar file uploader */
 [data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] {
-    background: linear-gradient(135deg, #1e6030 0%, #2d8a4a 100%)!important;
-    border: 2px dashed #2d5a8e!important;
-    border-radius: 8px!important;
+    background-color: #1a3050 !important;
+    border: 2px dashed #2d5a8e !important;
+    color: #93c5fd !important;
 }
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"]:hover {
-    border-color: #4da6ff!important;
-    background: linear-gradient(135deg, #2d8a4a 0%, #3ba55d 100%)!important;
-}
-
-/* ALL text nodes inside dropzone */
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] *,
 [data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] span,
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] p,
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] small,
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] div {
+[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] p {
     color: #93c5fd !important;
-    font-weight: 500 !important;
-}
-
-/* "Browse files" button inside dropzone */
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button {
-    background-color: #1e3f6e !important;
-    color: #ffffff !important;
-    border: 1px solid #2d5a8e !important;
-    border-radius: 6px !important;
-    font-weight: 600 !important;
-    font-size: 0.80rem !important;
-    padding: 5px 14px !important;
-    transition: all 0.2s ease !important;
-}
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button:hover {
-    background-color: #2d5a8e !important;
-    border-color: #4da6ff !important;
-    color: #ffffff !important;
-}
-
-/* Helper text "200MB per file • JSON" */
-[data-testid="stSidebar"] [data-testid="stFileUploaderDropzoneInstructions"] small,
-[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] small {
-    color: #5b8db8 !important;
-    font-size: 0.72rem !important;
-    font-weight: 400 !important;
-}
-
-/* Uploaded file chip / name shown after upload */
-[data-testid="stSidebar"] [data-testid="stFileUploaderFile"] {
-    background-color: #162d50 !important;
-    border: 1px solid #2d5a8e !important;
-    border-radius: 6px !important;
-    color: #e8f4fd !important;
-}
-[data-testid="stSidebar"] [data-testid="stFileUploaderFile"] span,
-[data-testid="stSidebar"] [data-testid="stFileUploaderFileName"] {
-    color: #e8f4fd !important;
-    font-weight: 500 !important;
-}
-[data-testid="stSidebar"] [data-testid="stFileUploaderFile"] button {
-    background: transparent !important;
-    color: #93c5fd !important;
-    border: none !important;
-}
-[data-testid="stSidebar"] [data-testid="stFileUploaderFile"] button:hover {
-    color: #ff6b6b !important;
 }
 
 /* Sidebar horizontal rule */
