@@ -661,17 +661,10 @@ st.markdown("""
 # ─────────────────────────────────────────────────────────────────────────────
 _v = st.session_state["_tbl_ver"]
 
-def _editor_key(base: str, df: pd.DataFrame) -> str:
-    """ถ้ามีคอลัมน์ไหนเป็น int ให้เปลี่ยน key เพื่อบังคับสร้าง widget ใหม่"""
-    return base + ("_int" if "int64" in df.dtypes.values else "_float")
-
-def _sync_thk():
+def _sync_and_rerun():
+    """อัปเดต source ทั้ง 3 ตาราง แล้ว rerun เพื่อให้ค่าเข้าทันที"""
     st.session_state["thk_src"] = st.session_state["_tmp_thk"].astype("float64")
-
-def _sync_tdn():
     st.session_state["tdn_src"] = st.session_state["_tmp_tdn"].astype("float64")
-
-def _sync_ld():
     st.session_state["ld_src"] = st.session_state["_tmp_ld"].astype("float64")
 
 st.markdown("""
@@ -699,8 +692,11 @@ with c1:
         st.session_state["thk_src"].astype("float64"),
         num_rows="dynamic", 
         key="_tmp_thk",
-        on_change=_sync_thk,  # ← เพิ่มบรรทัดนี้
         use_container_width=True)
+    # ถ้าค่าเปลี่ยน ให้ sync แล้ว rerun ทันที
+    if not df_thk.equals(st.session_state["thk_src"]):
+        st.session_state["thk_src"] = df_thk.astype("float64")
+        st.rerun()
     st.session_state["_cur_thk"] = df_thk
 
     st.subheader("🔩 Tendon Profile  z(x)  [from top face]")
@@ -708,8 +704,10 @@ with c1:
         st.session_state["tdn_src"].astype("float64"),
         num_rows="dynamic", 
         key="_tmp_tdn",
-        on_change=_sync_tdn,  # ← เพิ่มบรรทัดนี้
         use_container_width=True)
+    if not df_tdn.equals(st.session_state["tdn_src"]):
+        st.session_state["tdn_src"] = df_tdn.astype("float64")
+        st.rerun()
     st.session_state["_cur_tdn"] = df_tdn
 with c2:
     st.subheader("📦 Loads per 1 m strip")
@@ -717,10 +715,11 @@ with c2:
         st.session_state["ld_src"].astype("float64"),
         num_rows="dynamic", 
         key="_tmp_ld",
-        on_change=_sync_ld,  # ← เพิ่มบรรทัดนี้
         use_container_width=True)
+    if not df_ld.equals(st.session_state["ld_src"]):
+        st.session_state["ld_src"] = df_ld.astype("float64")
+        st.rerun()
     st.session_state["_cur_ld"] = df_ld
-
 # ─────────────────────────────────────────────────────────────────────────────
 # PRESTRESS LOSS ENGINE  (AASHTO LRFD 5.9.3)  — UNCHANGED
 # ─────────────────────────────────────────────────────────────────────────────
