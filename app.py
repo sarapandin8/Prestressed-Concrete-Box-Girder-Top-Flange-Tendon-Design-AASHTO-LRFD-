@@ -83,7 +83,7 @@ if "_uploader_reset" not in st.session_state:
 # ── One-time cleanup: force data_editors to re-render with updated column_config
 # Old widget state (stored under ed_thk/ed_tdn/ed_ld) holds integer step schema.
 # Delete it once so Streamlit rebuilds editor with NumberColumn(step=0.01).
-_COL_CFG_VER = "v4_strtext"
+_COL_CFG_VER = "v5_numeric_load"
 if st.session_state.get("_col_cfg_ver") != _COL_CFG_VER:
     for _ek in ["ed_thk", "ed_tdn", "ed_ld"]:
         st.session_state.pop(_ek, None)
