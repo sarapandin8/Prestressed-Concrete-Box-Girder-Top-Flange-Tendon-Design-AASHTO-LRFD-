@@ -661,7 +661,7 @@ st.markdown("""
 # ─────────────────────────────────────────────────────────────────────────────
 _v = st.session_state["_tbl_ver"]
 
-# CSS ปุ่ม Primary สีกรมท่า
+# CSS ปุ่ม Primary สีกรมท่า + ปุ่ม Secondary สีเทา
 st.markdown("""
 <style>
 div[data-testid="stButton"] > button[kind="primary"] {
@@ -681,11 +681,9 @@ div[data-testid="stButton"] > button[kind="primary"]:hover {
 div[data-testid="stButton"] > button[kind="primary"]:active {
     background-color: #081629 !important;
     border: 1px solid #081629 !important;
-    transform: translateY(0px);
 }
-div[data-testid="stButton"] > button[kind="primary"]:focus {
-    box-shadow: 0 0 0 0.2rem rgba(13, 31, 60, 0.4) !important;
-    outline: none !important;
+div[data-testid="stButton"] > button[kind="secondary"] {
+    border-radius: 8px !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -702,12 +700,12 @@ st.markdown("""
         📊  Input Station Tables
     </div>
     <div style="font-size:0.8rem; color:#4a6080;">
-        แก้ข้อมูลในตารางได้หลายช่อง แล้วกดปุ่ม "Update Data" ใต้ตารางนั้นเพื่ออัปเดทผลลัพธ์
+        แก้ข้อมูลในตารางได้หลายช่อง แล้วกดปุ่ม "Update Data" เพื่ออัปเดท | Hover ที่หัวตารางเพื่อดูคำอธิบาย
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-# แถวบน: Thickness + Tendon ครึ่งจอ
+# แถวบน: Thickness + Tendon
 c1, c2 = st.columns(2)
 with c1:
     st.subheader("📏 Flange Thickness  t(x)")
@@ -715,12 +713,32 @@ with c1:
         st.session_state["thk_src"].astype("float64"),
         num_rows="dynamic", 
         key="_tmp_thk",
-        use_container_width=True)
+        use_container_width=True,
+        column_config={
+            "x (m)": st.column_config.NumberColumn(
+                "x (m)", 
+                help="ระยะจากกึ่งกลางสะพาน x=0 ถึงขอบ B/2", 
+                format="%.3f"
+            ),
+            "t (mm)": st.column_config.NumberColumn(
+                "t (mm)", 
+                help="ความหนา Top flange ที่ตำแหน่ง x นั้นๆ", 
+                format="%.1f"
+            ),
+        }
+    )
     
-    if st.button("🔄  Update Thickness Data", key="btn_update_thk", use_container_width=True, type="primary"):
-        st.session_state["thk_src"] = df_thk_edit.astype("float64")
-        st.success("✅ Thickness data updated")
-        st.rerun()
+    b1, b2 = st.columns(2)
+    with b1:
+        if st.button("🔄 Update Thickness", key="btn_update_thk", use_container_width=True, type="primary"):
+            st.session_state["thk_src"] = df_thk_edit.astype("float64")
+            st.success("✅ Thickness data updated")
+            st.rerun()
+    with b2:
+        if st.button("↩ Reset", key="btn_reset_thk", use_container_width=True):
+            st.session_state["thk_src"] = DEFAULT_TABLES["thk"].astype("float64")
+            st.success("↩ Reset to default")
+            st.rerun()
 
 with c2:
     st.subheader("🔩 Tendon Profile  z(x)  [from top face]")
@@ -728,12 +746,32 @@ with c2:
         st.session_state["tdn_src"].astype("float64"),
         num_rows="dynamic", 
         key="_tmp_tdn",
-        use_container_width=True)
+        use_container_width=True,
+        column_config={
+            "x (m)": st.column_config.NumberColumn(
+                "x (m)", 
+                help="ระยะจากกึ่งกลางสะพาน x=0 ถึงขอบ B/2", 
+                format="%.3f"
+            ),
+            "z (mm)": st.column_config.NumberColumn(
+                "z (mm)", 
+                help="ระยะจากผิวบน Flange ถึง CG ของลวดอัดแรง +ลงล่าง", 
+                format="%.1f"
+            ),
+        }
+    )
     
-    if st.button("🔄  Update Tendon Data", key="btn_update_tdn", use_container_width=True, type="primary"):
-        st.session_state["tdn_src"] = df_tdn_edit.astype("float64")
-        st.success("✅ Tendon data updated")
-        st.rerun()
+    b3, b4 = st.columns(2)
+    with b3:
+        if st.button("🔄 Update Tendon", key="btn_update_tdn", use_container_width=True, type="primary"):
+            st.session_state["tdn_src"] = df_tdn_edit.astype("float64")
+            st.success("✅ Tendon data updated")
+            st.rerun()
+    with b4:
+        if st.button("↩ Reset", key="btn_reset_tdn", use_container_width=True):
+            st.session_state["tdn_src"] = DEFAULT_TABLES["tdn"].astype("float64")
+            st.success("↩ Reset to default")
+            st.rerun()
 
 st.divider()
 
@@ -744,13 +782,33 @@ df_ld_edit = st.data_editor(
     num_rows="dynamic", 
     key="_tmp_ld",
     use_container_width=True,
-    height=350  # เพิ่มความสูงให้เห็นหลายแถวพร้อมกัน
+    height=350,
+    column_config={
+        "x (m)": st.column_config.NumberColumn("x (m)", help="ตำแหน่งตามแนวขวาง", format="%.3f"),
+        "M_DC": st.column_config.NumberColumn("M_DC (kN·m)", help="โมเมนต์จาก Dead Load คอนกรีต", format="%.2f"),
+        "M_DW": st.column_config.NumberColumn("M_DW (kN·m)", help="โมเมนต์จาก Dead Load ผิวทาง", format="%.2f"),
+        "M_LLa": st.column_config.NumberColumn("M_LLa (kN·m)", help="โมเมนต์จาก Live Load Case A", format="%.2f"),
+        "M_LLb": st.column_config.NumberColumn("M_LLb (kN·m)", help="โมเมนต์จาก Live Load Case B", format="%.2f"),
+        "M_LLc": st.column_config.NumberColumn("M_LLc (kN·m)", help="โมเมนต์จาก Live Load Case C", format="%.2f"),
+        "V_DC": st.column_config.NumberColumn("V_DC (kN)", help="แรงเฉือนจาก Dead Load คอนกรีต", format="%.2f"),
+        "V_DW": st.column_config.NumberColumn("V_DW (kN)", help="แรงเฉือนจาก Dead Load ผิวทาง", format="%.2f"),
+        "V_LLa": st.column_config.NumberColumn("V_LLa (kN)", help="แรงเฉือนจาก Live Load Case A", format="%.2f"),
+        "V_LLb": st.column_config.NumberColumn("V_LLb (kN)", help="แรงเฉือนจาก Live Load Case B", format="%.2f"),
+        "V_LLc": st.column_config.NumberColumn("V_LLc (kN)", help="แรงเฉือนจาก Live Load Case C", format="%.2f"),
+    }
 )
 
-if st.button("🔄  Update Load Data", key="btn_update_ld", use_container_width=True, type="primary"):
-    st.session_state["ld_src"] = df_ld_edit.astype("float64")
-    st.success("✅ Load data updated")
-    st.rerun()
+b5, b6 = st.columns([3, 1])
+with b5:
+    if st.button("🔄 Update Load Data", key="btn_update_ld", use_container_width=True, type="primary"):
+        st.session_state["ld_src"] = df_ld_edit.astype("float64")
+        st.success("✅ Load data updated")
+        st.rerun()
+with b6:
+    if st.button("↩ Reset", key="btn_reset_ld", use_container_width=True):
+        st.session_state["ld_src"] = DEFAULT_TABLES["ld"].astype("float64")
+        st.success("↩ Reset to default")
+        st.rerun()
 
 # ตัวแปรที่ใช้ Save/Load ให้อ่านจาก source เสมอ
 st.session_state["_cur_thk"] = st.session_state["thk_src"]
@@ -761,6 +819,7 @@ st.session_state["_cur_ld"] = st.session_state["ld_src"]
 df_thk = st.session_state["thk_src"]
 df_tdn = st.session_state["tdn_src"]
 df_ld = st.session_state["ld_src"]
+
 # ─────────────────────────────────────────────────────────────────────────────
 # PRESTRESS LOSS ENGINE  (AASHTO LRFD 5.9.3)  — UNCHANGED
 # ─────────────────────────────────────────────────────────────────────────────
