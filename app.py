@@ -736,7 +736,7 @@ with c1:
             st.rerun()
     with b2:
         if st.button("↩ Reset", key="btn_reset_thk", use_container_width=True):
-            st.session_state["thk_src"] = DEFAULT_TABLES["thk"].astype("float64")
+            st.session_state["thk_src"] = DEFAULT_TABLES["Flange Thickness"].astype("float64")
             st.success("↩ Reset to default")
             st.rerun()
 
@@ -769,7 +769,7 @@ with c2:
             st.rerun()
     with b4:
         if st.button("↩ Reset", key="btn_reset_tdn", use_container_width=True):
-            st.session_state["tdn_src"] = DEFAULT_TABLES["tdn"].astype("float64")
+            st.session_state["tdn_src"] = DEFAULT_TABLES["Tendon Profile"].astype("float64")
             st.success("↩ Reset to default")
             st.rerun()
 
@@ -806,7 +806,7 @@ with b5:
         st.rerun()
 with b6:
     if st.button("↩ Reset", key="btn_reset_ld", use_container_width=True):
-        st.session_state["ld_src"] = DEFAULT_TABLES["ld"].astype("float64")
+        st.session_state["ld_src"] = DEFAULT_TABLES["Loads"].astype("float64")
         st.success("↩ Reset to default")
         st.rerun()
 
@@ -819,7 +819,6 @@ st.session_state["_cur_ld"] = st.session_state["ld_src"]
 df_thk = st.session_state["thk_src"]
 df_tdn = st.session_state["tdn_src"]
 df_ld = st.session_state["ld_src"]
-
 # ─────────────────────────────────────────────────────────────────────────────
 # PRESTRESS LOSS ENGINE  (AASHTO LRFD 5.9.3)  — UNCHANGED
 # ─────────────────────────────────────────────────────────────────────────────
