@@ -661,6 +661,35 @@ st.markdown("""
 # ─────────────────────────────────────────────────────────────────────────────
 _v = st.session_state["_tbl_ver"]
 
+# CSS ปุ่ม Primary สีกรมท่า
+st.markdown("""
+<style>
+div[data-testid="stButton"] > button[kind="primary"] {
+    background-color: #0d1f3c !important;
+    border: 1px solid #0d1f3c !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    transition: all 0.2s ease !important;
+}
+div[data-testid="stButton"] > button[kind="primary"]:hover {
+    background-color: #1a2f4d !important;
+    border: 1px solid #1a2f4d !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(13, 31, 60, 0.3) !important;
+}
+div[data-testid="stButton"] > button[kind="primary"]:active {
+    background-color: #081629 !important;
+    border: 1px solid #081629 !important;
+    transform: translateY(0px);
+}
+div[data-testid="stButton"] > button[kind="primary"]:focus {
+    box-shadow: 0 0 0 0.2rem rgba(13, 31, 60, 0.4) !important;
+    outline: none !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 st.markdown("""
 <div style="
     background: #ffffff;
@@ -687,7 +716,6 @@ with c1:
         key="_tmp_thk",
         use_container_width=True)
     
-    # ปุ่ม Update ใต้ตาราง Thickness
     if st.button("🔄  Update Thickness Data", key="btn_update_thk", use_container_width=True, type="primary"):
         st.session_state["thk_src"] = df_thk_edit.astype("float64")
         st.success("✅ Thickness data updated")
@@ -700,7 +728,6 @@ with c1:
         key="_tmp_tdn",
         use_container_width=True)
     
-    # ปุ่ม Update ใต้ตาราง Tendon
     if st.button("🔄  Update Tendon Data", key="btn_update_tdn", use_container_width=True, type="primary"):
         st.session_state["tdn_src"] = df_tdn_edit.astype("float64")
         st.success("✅ Tendon data updated")
@@ -714,16 +741,20 @@ with c2:
         key="_tmp_ld",
         use_container_width=True)
     
-    # ปุ่ม Update ใต้ตาราง Load
     if st.button("🔄  Update Load Data", key="btn_update_ld", use_container_width=True, type="primary"):
         st.session_state["ld_src"] = df_ld_edit.astype("float64")
         st.success("✅ Load data updated")
         st.rerun()
 
-# ตัวแปรที่ใช้คำนวณ ให้อ่านจาก source เสมอ
+# ตัวแปรที่ใช้ Save/Load ให้อ่านจาก source เสมอ
 st.session_state["_cur_thk"] = st.session_state["thk_src"]
 st.session_state["_cur_tdn"] = st.session_state["tdn_src"]
 st.session_state["_cur_ld"] = st.session_state["ld_src"]
+
+# ตัวแปรที่ใช้คำนวณ ให้โค้ดส่วน calc_losses มองเห็น
+df_thk = st.session_state["thk_src"]
+df_tdn = st.session_state["tdn_src"]
+df_ld = st.session_state["ld_src"]
 # ─────────────────────────────────────────────────────────────────────────────
 # PRESTRESS LOSS ENGINE  (AASHTO LRFD 5.9.3)  — UNCHANGED
 # ─────────────────────────────────────────────────────────────────────────────
