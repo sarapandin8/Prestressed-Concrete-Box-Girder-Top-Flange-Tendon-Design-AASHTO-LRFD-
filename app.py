@@ -43,12 +43,12 @@ DEFAULT_TABLES = dict(
     df_tendon={"x (m)": [0.00, 1.00, 2.00, 3.00, 4.00, 5.00, 6.00, 7.00, 8.00, 9.00, 10.00, 11.00, 12.00], "z_top (m)": [0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100]},
     df_load={
         "x (m)":         [ 0.00, 1.00, 2.00, 3.00, 4.00, 5.00, 6.00, 7.00, 8.00, 9.00, 10.00, 11.00, 12.00],
-        "M_DL (kNm/m)":  [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
-        "V_DL (kN/m)":   [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
-        "M_SDL (kNm/m)": [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
-        "V_SDL (kN/m)":  [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
-        "M_LL (kNm/m)":  [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
-        "V_LL (kN/m)":   [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
+        "M_DL (kNm/m)":  ["0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00"],
+        "V_DL (kN/m)":   ["0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00"],
+        "M_SDL (kNm/m)": ["0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00"],
+        "V_SDL (kN/m)":  ["0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00"],
+        "M_LL (kNm/m)":  ["0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00"],
+        "V_LL (kN/m)":   ["0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00","0.00"],
     },
 )
 
@@ -65,17 +65,28 @@ for k, v in DEFAULT_SCALARS.items():
 _TABLE_SRC = {"thk_src": "df_thickness", "tdn_src": "df_tendon", "ld_src": "df_load"}
 
 def _make_float_df(data: dict) -> pd.DataFrame:
-    """Create DataFrame and force ALL columns to float64.
-    Prevents Streamlit data_editor from locking to integer-only input
-    when all default values happen to be whole numbers (0.00 -> int64 by pandas)."""
+    """Force numeric columns to float64 for thickness/tendon tables."""
     df = pd.DataFrame(data)
     for col in df.columns:
         df[col] = df[col].astype(float)
     return df
 
+def _make_str_df(data: dict) -> pd.DataFrame:
+    """Keep load value columns as str so TextColumn allows free decimal typing.
+    x(m) stays float; M/V columns stay as string '0.00'."""
+    df = pd.DataFrame(data)
+    df['x (m)'] = df['x (m)'].astype(float)
+    for col in df.columns:
+        if col != 'x (m)':
+            df[col] = df[col].astype(str)
+    return df
+
 for src_key, tbl_key in _TABLE_SRC.items():
     if src_key not in st.session_state:
-        st.session_state[src_key] = _make_float_df(DEFAULT_TABLES[tbl_key])
+        if src_key == 'ld_src':
+            st.session_state[src_key] = _make_str_df(DEFAULT_TABLES[tbl_key])
+        else:
+            st.session_state[src_key] = _make_float_df(DEFAULT_TABLES[tbl_key])
 
 if "_uploader_reset" not in st.session_state:
     st.session_state["_uploader_reset"] = 0
@@ -83,7 +94,7 @@ if "_uploader_reset" not in st.session_state:
 # ── One-time cleanup: force data_editors to re-render with updated column_config
 # Old widget state (stored under ed_thk/ed_tdn/ed_ld) holds integer step schema.
 # Delete it once so Streamlit rebuilds editor with NumberColumn(step=0.01).
-_COL_CFG_VER = "v1_decimal"
+_COL_CFG_VER = "v2_textcol"
 if st.session_state.get("_col_cfg_ver") != _COL_CFG_VER:
     for _ek in ["ed_thk", "ed_tdn", "ed_ld"]:
         st.session_state.pop(_ek, None)
@@ -267,16 +278,16 @@ with c1:
 
 with c2:
     st.subheader("📦 Loads per 1 m strip")
+    # ใช้ TextColumn สำหรับคอลัมน์ M/V เพื่อให้พิมพ์ทศนิยมได้อิสระ (0.56, -1.25 ฯลฯ)
+    # NumberColumn ใช้ <input type=number> ซึ่ง browser block '.' ระหว่างพิมพ์
+    _load_val_cols = ["M_DL (kNm/m)","V_DL (kN/m)","M_SDL (kNm/m)",
+                      "V_SDL (kN/m)","M_LL (kNm/m)","V_LL (kN/m)"]
     df_ld = st.data_editor(
         st.session_state["ld_src"], num_rows="dynamic", key="ed_ld",
         column_config={
             "x (m)": st.column_config.NumberColumn("x (m)", format="%.2f", step=0.01),
-            "M_DL (kNm/m)": st.column_config.NumberColumn("M_DL (kNm/m)", format="%.2f", step=0.01),
-            "V_DL (kN/m)": st.column_config.NumberColumn("V_DL (kN/m)", format="%.2f", step=0.01),
-            "M_SDL (kNm/m)": st.column_config.NumberColumn("M_SDL (kNm/m)", format="%.2f", step=0.01),
-            "V_SDL (kN/m)": st.column_config.NumberColumn("V_SDL (kN/m)", format="%.2f", step=0.01),
-            "M_LL (kNm/m)": st.column_config.NumberColumn("M_LL (kNm/m)", format="%.2f", step=0.01),
-            "V_LL (kN/m)": st.column_config.NumberColumn("V_LL (kN/m)", format="%.2f", step=0.01),
+            **{c: st.column_config.TextColumn(c, help="กรอกตัวเลข เช่น 0.56, -1.25")
+               for c in _load_val_cols},
         },
     )
 # ─────────────────────────────────────────────────────────────────────────────
