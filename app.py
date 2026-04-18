@@ -665,6 +665,15 @@ def _editor_key(base: str, df: pd.DataFrame) -> str:
     """ถ้ามีคอลัมน์ไหนเป็น int ให้เปลี่ยน key เพื่อบังคับสร้าง widget ใหม่"""
     return base + ("_int" if "int64" in df.dtypes.values else "_float")
 
+def _sync_thk():
+    st.session_state["thk_src"] = st.session_state["_tmp_thk"].astype("float64")
+
+def _sync_tdn():
+    st.session_state["tdn_src"] = st.session_state["_tmp_tdn"].astype("float64")
+
+def _sync_ld():
+    st.session_state["ld_src"] = st.session_state["_tmp_ld"].astype("float64")
+
 st.markdown("""
 <div style="
     background: #ffffff;
@@ -687,29 +696,29 @@ c1, c2 = st.columns(2)
 with c1:
     st.subheader("📏 Flange Thickness  t(x)")
     df_thk = st.data_editor(
-        st.session_state["thk_src"].astype("float64"),  # ← เพิ่ม .astype("float64")
+        st.session_state["thk_src"].astype("float64"),
         num_rows="dynamic", 
-        key=_editor_key("ed_thk", st.session_state["thk_src"]),  # ← เปลี่ยน key
+        key="_tmp_thk",
+        on_change=_sync_thk,  # ← เพิ่มบรรทัดนี้
         use_container_width=True)
-    st.session_state["thk_src"] = df_thk.astype("float64")  # ← เพิ่มบรรทัดนี้
     st.session_state["_cur_thk"] = df_thk
 
     st.subheader("🔩 Tendon Profile  z(x)  [from top face]")
     df_tdn = st.data_editor(
-        st.session_state["tdn_src"].astype("float64"),  # ← เพิ่ม .astype("float64")
+        st.session_state["tdn_src"].astype("float64"),
         num_rows="dynamic", 
-        key=_editor_key("ed_tdn", st.session_state["tdn_src"]),  # ← เปลี่ยน key
+        key="_tmp_tdn",
+        on_change=_sync_tdn,  # ← เพิ่มบรรทัดนี้
         use_container_width=True)
-    st.session_state["tdn_src"] = df_tdn.astype("float64")  # ← เพิ่มบรรทัดนี้
     st.session_state["_cur_tdn"] = df_tdn
 with c2:
     st.subheader("📦 Loads per 1 m strip")
     df_ld = st.data_editor(
-        st.session_state["ld_src"].astype("float64"),  # ← เพิ่ม .astype("float64")
+        st.session_state["ld_src"].astype("float64"),
         num_rows="dynamic", 
-        key=_editor_key("ed_ld", st.session_state["ld_src"]),  # ← เปลี่ยน key
+        key="_tmp_ld",
+        on_change=_sync_ld,  # ← เพิ่มบรรทัดนี้
         use_container_width=True)
-    st.session_state["ld_src"] = df_ld.astype("float64")  # ← เพิ่มบรรทัดนี้
     st.session_state["_cur_ld"] = df_ld
 
 # ─────────────────────────────────────────────────────────────────────────────
