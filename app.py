@@ -237,66 +237,68 @@ with st.sidebar:
     eng_name  = st.text_input("Prepared by",  key="eng_name")
     chk_name  = st.text_input("Checked by",   key="chk_name")
 # ─────────────────────────────────────────────────────────────────────────────
-# 3.  DATA EDITORS
+# 3. DATA EDITORS
 # ─────────────────────────────────────────────────────────────────────────────
-st.title("🏗️  PSC Box Girder — Top Flange Transverse Design")
-st.caption("AASHTO LRFD  |  1.0 m transverse strip  |  "
-           "Compression (−)  Tension (+)  |  +M = sagging")
+def _force_float_and_rerun():
+    """Callback: บังคับทุกตารางเป็น float แล้ว rerun เพื่อรีเซ็ต widget"""
+    for src, ed in [("thk_src", "ed_thk"), ("tdn_src", "ed_tdn"), ("ld_src", "ed_ld")]:
+        if ed in st.session_state:
+            df = st.session_state[ed]
+            for col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce").astype(float)
+            st.session_state[src] = df
+    st.rerun() # สำคัญ: สร้าง widget ใหม่ทันที
 
-# Keep Load columns numeric for stable decimal input
-LD_MV_COLS = [
-    "M_DL (kNm/m)", "V_DL (kN/m)",
-    "M_SDL (kNm/m)", "V_SDL (kN/m)",
-    "M_LL (kNm/m)", "V_LL (kN/m)",
-]
+st.title("🏗️ PSC Box Girder — Top Flange Transverse Design")
+st.caption("AASHTO LRFD | 1.0 m transverse strip | "
+           "Compression (−) Tension (+) | +M = sagging")
 
 c1, c2 = st.columns(2)
 with c1:
     st.subheader("📏 Flange Thickness t(x)")
-    df_thk = st.data_editor(
-        st.session_state["thk_src"], num_rows="dynamic", key="ed_thk",
+    # ก่อนส่งเข้า data_editor บังคับ float อีกรอบกันเหนียว
+    _df_thk = st.session_state["thk_src"].astype(float)
+    st.data_editor(
+        _df_thk, num_rows="dynamic", key="ed_thk",
         column_config={
-            "x (m)":  st.column_config.NumberColumn("x (m)",  format="%.2f",  step=0.01),
-            "t (m)":  st.column_config.NumberColumn("t (m)",  format="%.3f",  step=0.001),
+            "x (m)": st.column_config.NumberColumn("x (m)", format="%.2f", step=0.01),
+            "t (m)": st.column_config.NumberColumn("t (m)", format="%.3f", step=0.001),
         },
+        on_change=_force_float_and_rerun, # เพิ่มบรรทัดนี้
     )
 
     st.subheader("🔩 Tendon Profile z(x) [from top face]")
-    df_tdn = st.data_editor(
-        st.session_state["tdn_src"], num_rows="dynamic", key="ed_tdn",
+    _df_tdn = st.session_state["tdn_src"].astype(float)
+    st.data_editor(
+        _df_tdn, num_rows="dynamic", key="ed_tdn",
         column_config={
-            "x (m)":      st.column_config.NumberColumn("x (m)",      format="%.2f",  step=0.01),
-            "z_top (m)":  st.column_config.NumberColumn("z_top (m)",  format="%.3f",  step=0.001),
+            "x (m)": st.column_config.NumberColumn("x (m)", format="%.2f", step=0.01),
+            "z_top (m)": st.column_config.NumberColumn("z_top (m)", format="%.3f", step=0.001),
         },
+        on_change=_force_float_and_rerun, # เพิ่มบรรทัดนี้
     )
 
 with c2:
     st.subheader("📦 Loads per 1 m strip")
-    st.caption("กรอกตัวเลขได้ทั้งบวก/ลบ และทศนิยม เช่น  1.25  หรือ  -0.56")
-
-    st.session_state["ld_src"] = st.session_state["ld_src"].apply(
-        pd.to_numeric, errors="coerce"
-    ).astype(float)
-
-    df_ld = st.data_editor(
-        st.session_state["ld_src"],
-        num_rows="dynamic", key="ed_ld",
+    _df_ld = st.session_state["ld_src"].astype(float)
+    st.data_editor(
+        _df_ld, num_rows="dynamic", key="ed_ld",
         column_config={
             "x (m)": st.column_config.NumberColumn("x (m)", format="%.2f", step=0.01),
-            **{
-                c: st.column_config.NumberColumn(c, format="%.2f", step=0.01)
-                for c in LD_MV_COLS
-                if c in st.session_state["ld_src"].columns
-            },
+            "M_DL (kNm/m)": st.column_config.NumberColumn("M_DL (kNm/m)", format="%.2f", step=0.01),
+            "V_DL (kN/m)": st.column_config.NumberColumn("V_DL (kN/m)", format="%.2f", step=0.01),
+            "M_SDL (kNm/m)": st.column_config.NumberColumn("M_SDL (kNm/m)", format="%.2f", step=0.01),
+            "V_SDL (kN/m)": st.column_config.NumberColumn("V_SDL (kN/m)", format="%.2f", step=0.01),
+            "M_LL (kNm/m)": st.column_config.NumberColumn("M_LL (kNm/m)", format="%.2f", step=0.01),
+            "V_LL (kN/m)": st.column_config.NumberColumn("V_LL (kN/m)", format="%.2f", step=0.01),
         },
+        on_change=_force_float_and_rerun, # เพิ่มบรรทัดนี้
     )
 
-    _ld_saved = df_ld.copy()
-    for c in _ld_saved.columns:
-        _ld_saved[c] = pd.to_numeric(_ld_saved[c], errors="coerce")
-    _ld_saved = _ld_saved.dropna(how="all")
-    st.session_state["ld_src"] = _ld_saved.astype(float)
-
+# หลัง editor ใช้ค่าจาก src ที่ถูก sync แล้วเท่านั้น
+df_thk = st.session_state["thk_src"]
+df_tdn = st.session_state["tdn_src"]
+df_ld = st.session_state["ld_src"]
 # ─────────────────────────────────────────────────────────────────────────────
 # 4.  CALCULATION ENGINE
 # ─────────────────────────────────────────────────────────────────────────────
