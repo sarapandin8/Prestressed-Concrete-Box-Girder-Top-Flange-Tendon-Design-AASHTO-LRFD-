@@ -236,8 +236,6 @@ with st.sidebar:
     doc_no    = st.text_input("Document No.", key="doc_no")
     eng_name  = st.text_input("Prepared by",  key="eng_name")
     chk_name  = st.text_input("Checked by",   key="chk_name")
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 # 3.  DATA EDITORS
 # ─────────────────────────────────────────────────────────────────────────────
@@ -245,22 +243,12 @@ st.title("🏗️  PSC Box Girder — Top Flange Transverse Design")
 st.caption("AASHTO LRFD  |  1.0 m transverse strip  |  "
            "Compression (−)  Tension (+)  |  +M = sagging")
 
-# ── helper: แปลง M/V columns เป็น str ก่อนส่งเข้า data_editor
-# เมื่อ dtype=object Streamlit render <input type="text"> แทน <input type="number">
-# text input ยอมรับ "." ได้ทุกกรณี — prep() แปลงกลับเป็น float ให้เอง
-_LD_MV_COLS = ["M_DL (kNm/m)", "V_DL (kN/m)", "M_SDL (kNm/m)",
-               "V_SDL (kN/m)", "M_LL (kNm/m)", "V_LL (kN/m)"]
-
-def _ld_for_display(src_df: pd.DataFrame) -> pd.DataFrame:
-    """ส่ง copy ที่ M/V เป็น str → data_editor ใช้ text input"""
-    d = src_df.copy()
-    for c in _LD_MV_COLS:
-        if c in d.columns:
-            d[c] = d[c].apply(
-                lambda v: (f"{float(v):.3f}" if str(v).replace("-","").replace(".","").isdigit()
-                           else str(v)) if pd.notna(v) else "0.000"
-            )
-    return d
+# Keep Load columns numeric for stable decimal input
+LD_MV_COLS = [
+    "M_DL (kNm/m)", "V_DL (kN/m)",
+    "M_SDL (kNm/m)", "V_SDL (kN/m)",
+    "M_LL (kNm/m)", "V_LL (kN/m)",
+]
 
 c1, c2 = st.columns(2)
 with c1:
@@ -285,23 +273,30 @@ with c1:
 with c2:
     st.subheader("📦 Loads per 1 m strip")
     st.caption("กรอกตัวเลขได้ทั้งบวก/ลบ และทศนิยม เช่น  1.25  หรือ  -0.56")
-    # ส่ง DataFrame ที่ M/V เป็น str → Streamlit ใช้ text input (ไม่ block จุดทศนิยม)
-    # column_config เฉพาะ x(m) เท่านั้น ส่วน M/V ไม่ระบุ → auto TextColumn
+
+    st.session_state["ld_src"] = st.session_state["ld_src"].apply(
+        pd.to_numeric, errors="coerce"
+    ).astype(float)
+
     df_ld = st.data_editor(
-        _ld_for_display(st.session_state["ld_src"]),
+        st.session_state["ld_src"],
         num_rows="dynamic", key="ed_ld",
         column_config={
             "x (m)": st.column_config.NumberColumn("x (m)", format="%.2f", step=0.01),
+            **{
+                c: st.column_config.NumberColumn(c, format="%.2f", step=0.01)
+                for c in LD_MV_COLS
+                if c in st.session_state["ld_src"].columns
+            },
         },
     )
-    # แปลง M/V columns กลับเป็น float เก็บใน ld_src สำหรับ calculation
-    _ld_saved = st.session_state["ld_src"].copy()
-    for c in _LD_MV_COLS:
-        if c in df_ld.columns:
-            _ld_saved[c] = pd.to_numeric(df_ld[c], errors="coerce").fillna(0.0)
-    if "x (m)" in df_ld.columns:
-        _ld_saved["x (m)"] = pd.to_numeric(df_ld["x (m)"], errors="coerce")
-    st.session_state["ld_src"] = _ld_saved
+
+    _ld_saved = df_ld.copy()
+    for c in _ld_saved.columns:
+        _ld_saved[c] = pd.to_numeric(_ld_saved[c], errors="coerce")
+    _ld_saved = _ld_saved.dropna(how="all")
+    st.session_state["ld_src"] = _ld_saved.astype(float)
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 4.  CALCULATION ENGINE
 # ─────────────────────────────────────────────────────────────────────────────
