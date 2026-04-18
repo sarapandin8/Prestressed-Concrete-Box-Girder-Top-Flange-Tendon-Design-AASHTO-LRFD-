@@ -42,13 +42,13 @@ DEFAULT_TABLES = dict(
     df_thickness={"x (m)": [0.00, 1.00, 2.00, 3.00, 4.00, 5.00, 6.00, 7.00, 8.00, 9.00, 10.00, 11.00, 12.00], "t (m)": [0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250]},
     df_tendon={"x (m)": [0.00, 1.00, 2.00, 3.00, 4.00, 5.00, 6.00, 7.00, 8.00, 9.00, 10.00, 11.00, 12.00], "z_top (m)": [0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100]},
     df_load={
-        "x (m)":         [ 0.00,   1.00,   2.00,   3.00,   4.00,   5.00,   6.00,   7.00,   8.00,   9.00,   10.00,   11.00,   12.00],
-        "M_DL (kNm/m)":  [ 10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,    10.00],
-        "V_DL (kN/m)":   [ 10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,    10.00],
-        "M_SDL (kNm/m)": [ 10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,    10.00],
-        "V_SDL (kN/m)":  [ 10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,    10.00],
-        "M_LL (kNm/m)":  [ 10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,    10.00],
-        "V_LL (kN/m)":   [ 10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,   10.00,    10.00],
+        "x (m)":         [ 0.00, 1.00, 2.00, 3.00, 4.00, 5.00, 6.00, 7.00, 8.00, 9.00, 10.00, 11.00, 12.00],
+        "M_DL (kNm/m)":  [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
+        "V_DL (kN/m)":   [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
+        "M_SDL (kNm/m)": [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
+        "V_SDL (kN/m)":  [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
+        "M_LL (kNm/m)":  [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
+        "V_LL (kN/m)":   [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
     },
 )
 
@@ -63,32 +63,12 @@ for k, v in DEFAULT_SCALARS.items():
 #   - ed_thk  = widget internal state managed by Streamlit (never write to it)
 # This prevents StreamlitValueAssignmentNotAllowedError AND double-input issue
 _TABLE_SRC = {"thk_src": "df_thickness", "tdn_src": "df_tendon", "ld_src": "df_load"}
-
-def _make_float_df(data: dict) -> pd.DataFrame:
-    """สร้าง DataFrame และบังคับทุกคอลัมน์เป็น float64 แม้จะเป็นค่าว่าง"""
-    # สร้าง df พร้อมกำหนด dtype ล่วงหน้า ป้องกันเคสเพิ่มแถวใหม่แล้วกลายเป็น int
-    df = pd.DataFrame({col: pd.Series(vals, dtype="float64") for col, vals in data.items()})
-    return df
-    
-    df = pd.DataFrame(data)
-    # บังคับทุกคอลัมน์เป็น float แม้ค่าทั้งหมดจะเป็น 0
-    return df.astype("float64")
-
 for src_key, tbl_key in _TABLE_SRC.items():
     if src_key not in st.session_state:
-        st.session_state[src_key] = _make_float_df(DEFAULT_TABLES[tbl_key])
+        st.session_state[src_key] = pd.DataFrame(DEFAULT_TABLES[tbl_key])
 
 if "_uploader_reset" not in st.session_state:
     st.session_state["_uploader_reset"] = 0
-
-# ── One-time cleanup: force data_editors to re-render with updated column_config
-# Old widget state (stored under ed_thk/ed_tdn/ed_ld) holds integer step schema.
-# Delete it once so Streamlit rebuilds editor with NumberColumn(step=0.01).
-_COL_CFG_VER = "v5_numeric_load"
-if st.session_state.get("_col_cfg_ver") != _COL_CFG_VER:
-    for _ek in ["ed_thk", "ed_tdn", "ed_ld"]:
-        st.session_state.pop(_ek, None)
-    st.session_state["_col_cfg_ver"] = _COL_CFG_VER
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -172,7 +152,7 @@ with st.sidebar:
                         if table_data:
                             new_df = pd.DataFrame(table_data)
                             for col in new_df.columns:
-                                new_df[col] = pd.to_numeric(new_df[col], errors="coerce").astype(float)
+                                new_df[col] = pd.to_numeric(new_df[col], errors="coerce")
                             st.session_state[src_key] = new_df
                 
                 # ลบ editor key state และข้อมูลที่แก้ไขค้างไว้ เพื่อให้ data_editor ดึงค่าใหม่จาก src_key
@@ -238,61 +218,26 @@ with st.sidebar:
     eng_name  = st.text_input("Prepared by",  key="eng_name")
     chk_name  = st.text_input("Checked by",   key="chk_name")
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 3. DATA EDITORS
-# ─────────────────────────────────────────────────────────────────────────────
-def _get_editor_key(base: str, df: pd.DataFrame) -> str:
-    """ถ้าคอลัมน์ไหนเป็น int ให้เปลี่ยน key เพื่อบังคับสร้าง widget ใหม่"""
-    suffix = "_int" if any(df.dtypes == "int64") else "_float"
-    return base + suffix
 
-st.title("🏗️ PSC Box Girder — Top Flange Transverse Design")
-st.caption("AASHTO LRFD | 1.0 m transverse strip | "
-           "Compression (−) Tension (+) | +M = sagging")
+# ─────────────────────────────────────────────────────────────────────────────
+# 3.  DATA EDITORS
+# ─────────────────────────────────────────────────────────────────────────────
+st.title("🏗️  PSC Box Girder — Top Flange Transverse Design")
+st.caption("AASHTO LRFD  |  1.0 m transverse strip  |  "
+           "Compression (−)  Tension (+)  |  +M = sagging")
 
 c1, c2 = st.columns(2)
 with c1:
     st.subheader("📏 Flange Thickness t(x)")
-    df_thk = st.data_editor(
-        st.session_state["thk_src"].astype("float64"), 
-        num_rows="dynamic", 
-        key=_get_editor_key("ed_thk", st.session_state["thk_src"]),
-        column_config={
-            "x (m)": st.column_config.NumberColumn("x (m)", format="%.2f", step=0.01),
-            "t (m)": st.column_config.NumberColumn("t (m)", format="%.3f", step=0.001),
-        },
-    )
-    st.session_state["thk_src"] = df_thk.astype("float64")
-
-    st.subheader("🔩 Tendon Profile z(x) [from top face]")
-    df_tdn = st.data_editor(
-        st.session_state["tdn_src"].astype("float64"),
-        num_rows="dynamic", 
-        key=_get_editor_key("ed_tdn", st.session_state["tdn_src"]),
-        column_config={
-            "x (m)": st.column_config.NumberColumn("x (m)", format="%.2f", step=0.01),
-            "z_top (m)": st.column_config.NumberColumn("z_top (m)", format="%.3f", step=0.001),
-        },
-    )
-    st.session_state["tdn_src"] = df_tdn.astype("float64")
-
+    # Pass src key (stable, never same object as widget key) → no reset → single input works
+    df_thk = st.data_editor(st.session_state["thk_src"], num_rows="dynamic", key="ed_thk")
+    st.subheader("🔩 Tendon Profile z(x)  [from top face]")
+    df_tdn = st.data_editor(st.session_state["tdn_src"], num_rows="dynamic", key="ed_tdn")
 with c2:
     st.subheader("📦 Loads per 1 m strip")
-    df_ld = st.data_editor(
-        st.session_state["ld_src"].astype("float64"),
-        num_rows="dynamic", 
-        key=_get_editor_key("ed_ld", st.session_state["ld_src"]),
-        column_config={
-            "x (m)": st.column_config.NumberColumn("x (m)", format="%.2f", step=0.01),
-            "M_DL (kNm/m)": st.column_config.NumberColumn("M_DL (kNm/m)", format="%.2f", step=0.01),
-            "V_DL (kN/m)": st.column_config.NumberColumn("V_DL (kN/m)", format="%.2f", step=0.01),
-            "M_SDL (kNm/m)": st.column_config.NumberColumn("M_SDL (kNm/m)", format="%.2f", step=0.01),
-            "V_SDL (kN/m)": st.column_config.NumberColumn("V_SDL (kN/m)", format="%.2f", step=0.01),
-            "M_LL (kNm/m)": st.column_config.NumberColumn("M_LL (kNm/m)", format="%.2f", step=0.01),
-            "V_LL (kN/m)": st.column_config.NumberColumn("V_LL (kN/m)", format="%.2f", step=0.01),
-        },
-    )
-    st.session_state["ld_src"] = df_ld.astype("float64")
+    df_ld  = st.data_editor(st.session_state["ld_src"],  num_rows="dynamic", key="ed_ld")
+# No sync-back: Streamlit forbids writing to widget key; data_editor manages ed_thk etc.
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 4.  CALCULATION ENGINE
 # ─────────────────────────────────────────────────────────────────────────────
