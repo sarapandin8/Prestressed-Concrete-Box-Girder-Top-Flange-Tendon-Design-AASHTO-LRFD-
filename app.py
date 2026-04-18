@@ -43,12 +43,12 @@ DEFAULT_TABLES = dict(
     df_tendon={"x (m)": [0.00, 1.00, 2.00, 3.00, 4.00, 5.00, 6.00, 7.00, 8.00, 9.00, 10.00, 11.00, 12.00], "z_top (m)": [0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100, 0.100]},
     df_load={
         "x (m)":         [ 0.00, 1.00, 2.00, 3.00, 4.00, 5.00, 6.00, 7.00, 8.00, 9.00, 10.00, 11.00, 12.00],
-        "M_DL (kNm/m)":  [0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000],
-        "V_DL (kN/m)":   [0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000],
-        "M_SDL (kNm/m)": [0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000],
-        "V_SDL (kN/m)":  [0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000],
-        "M_LL (kNm/m)":  [0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000],
-        "V_LL (kN/m)":   [0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000],
+        "M_DL (kNm/m)":  [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
+        "V_DL (kN/m)":   [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
+        "M_SDL (kNm/m)": [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
+        "V_SDL (kN/m)":  [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
+        "M_LL (kNm/m)":  [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
+        "V_LL (kN/m)":   [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,  0.00,  0.00,  0.00],
     },
 )
 
@@ -83,7 +83,7 @@ if "_uploader_reset" not in st.session_state:
 # ── One-time cleanup: force data_editors to re-render with updated column_config
 # Old widget state (stored under ed_thk/ed_tdn/ed_ld) holds integer step schema.
 # Delete it once so Streamlit rebuilds editor with NumberColumn(step=0.01).
-_COL_CFG_VER = "v3_step001"
+_COL_CFG_VER = "v4_strtext"
 if st.session_state.get("_col_cfg_ver") != _COL_CFG_VER:
     for _ek in ["ed_thk", "ed_tdn", "ed_ld"]:
         st.session_state.pop(_ek, None)
@@ -245,14 +245,31 @@ st.title("🏗️  PSC Box Girder — Top Flange Transverse Design")
 st.caption("AASHTO LRFD  |  1.0 m transverse strip  |  "
            "Compression (−)  Tension (+)  |  +M = sagging")
 
+# ── helper: แปลง M/V columns เป็น str ก่อนส่งเข้า data_editor
+# เมื่อ dtype=object Streamlit render <input type="text"> แทน <input type="number">
+# text input ยอมรับ "." ได้ทุกกรณี — prep() แปลงกลับเป็น float ให้เอง
+_LD_MV_COLS = ["M_DL (kNm/m)", "V_DL (kN/m)", "M_SDL (kNm/m)",
+               "V_SDL (kN/m)", "M_LL (kNm/m)", "V_LL (kN/m)"]
+
+def _ld_for_display(src_df: pd.DataFrame) -> pd.DataFrame:
+    """ส่ง copy ที่ M/V เป็น str → data_editor ใช้ text input"""
+    d = src_df.copy()
+    for c in _LD_MV_COLS:
+        if c in d.columns:
+            d[c] = d[c].apply(
+                lambda v: (f"{float(v):.3f}" if str(v).replace("-","").replace(".","").isdigit()
+                           else str(v)) if pd.notna(v) else "0.000"
+            )
+    return d
+
 c1, c2 = st.columns(2)
 with c1:
     st.subheader("📏 Flange Thickness t(x)")
     df_thk = st.data_editor(
         st.session_state["thk_src"], num_rows="dynamic", key="ed_thk",
         column_config={
-            "x (m)": st.column_config.NumberColumn("x (m)", format="%.2f", step=0.01),
-            "t (m)": st.column_config.NumberColumn("t (m)", format="%.3f", step=0.001),
+            "x (m)":  st.column_config.NumberColumn("x (m)",  format="%.2f",  step=0.01),
+            "t (m)":  st.column_config.NumberColumn("t (m)",  format="%.3f",  step=0.001),
         },
     )
 
@@ -260,26 +277,31 @@ with c1:
     df_tdn = st.data_editor(
         st.session_state["tdn_src"], num_rows="dynamic", key="ed_tdn",
         column_config={
-            "x (m)": st.column_config.NumberColumn("x (m)", format="%.2f", step=0.01),
-            "z_top (m)": st.column_config.NumberColumn("z_top (m)", format="%.3f", step=0.001),
+            "x (m)":      st.column_config.NumberColumn("x (m)",      format="%.2f",  step=0.01),
+            "z_top (m)":  st.column_config.NumberColumn("z_top (m)",  format="%.3f",  step=0.001),
         },
     )
 
 with c2:
     st.subheader("📦 Loads per 1 m strip")
-    # ใช้ format='%.3f' step=0.001 เหมือนกับ Thickness เพื่อให้พิมพ์ทศนิยมได้
+    st.caption("กรอกตัวเลขได้ทั้งบวก/ลบ และทศนิยม เช่น  1.25  หรือ  -0.56")
+    # ส่ง DataFrame ที่ M/V เป็น str → Streamlit ใช้ text input (ไม่ block จุดทศนิยม)
+    # column_config เฉพาะ x(m) เท่านั้น ส่วน M/V ไม่ระบุ → auto TextColumn
     df_ld = st.data_editor(
-        st.session_state["ld_src"], num_rows="dynamic", key="ed_ld",
+        _ld_for_display(st.session_state["ld_src"]),
+        num_rows="dynamic", key="ed_ld",
         column_config={
             "x (m)": st.column_config.NumberColumn("x (m)", format="%.2f", step=0.01),
-            "M_DL (kNm/m)": st.column_config.NumberColumn("M_DL (kNm/m)", format="%.3f", step=0.001),
-            "V_DL (kN/m)": st.column_config.NumberColumn("V_DL (kN/m)", format="%.3f", step=0.001),
-            "M_SDL (kNm/m)": st.column_config.NumberColumn("M_SDL (kNm/m)", format="%.3f", step=0.001),
-            "V_SDL (kN/m)": st.column_config.NumberColumn("V_SDL (kN/m)", format="%.3f", step=0.001),
-            "M_LL (kNm/m)": st.column_config.NumberColumn("M_LL (kNm/m)", format="%.3f", step=0.001),
-            "V_LL (kN/m)": st.column_config.NumberColumn("V_LL (kN/m)", format="%.3f", step=0.001),
         },
     )
+    # แปลง M/V columns กลับเป็น float เก็บใน ld_src สำหรับ calculation
+    _ld_saved = st.session_state["ld_src"].copy()
+    for c in _LD_MV_COLS:
+        if c in df_ld.columns:
+            _ld_saved[c] = pd.to_numeric(df_ld[c], errors="coerce").fillna(0.0)
+    if "x (m)" in df_ld.columns:
+        _ld_saved["x (m)"] = pd.to_numeric(df_ld["x (m)"], errors="coerce")
+    st.session_state["ld_src"] = _ld_saved
 # ─────────────────────────────────────────────────────────────────────────────
 # 4.  CALCULATION ENGINE
 # ─────────────────────────────────────────────────────────────────────────────
