@@ -65,10 +65,10 @@ for k, v in DEFAULT_SCALARS.items():
 _TABLE_SRC = {"thk_src": "df_thickness", "tdn_src": "df_tendon", "ld_src": "df_load"}
 
 def _make_float_df(data: dict) -> pd.DataFrame:
-    """บังคับ float64 ทุกคอลัมน์ และกันเคส dict ว่าง"""
-    if not data or not any(data.values()):
-        # ถ้าไม่มีข้อมูล สร้าง df ว่างแต่กำหนด dtype float ไว้ก่อน
-        return pd.DataFrame({k: pd.Series(dtype="float64") for k in data.keys()})
+    """สร้าง DataFrame และบังคับทุกคอลัมน์เป็น float64 แม้จะเป็นค่าว่าง"""
+    # สร้าง df พร้อมกำหนด dtype ล่วงหน้า ป้องกันเคสเพิ่มแถวใหม่แล้วกลายเป็น int
+    df = pd.DataFrame({col: pd.Series(vals, dtype="float64") for col, vals in data.items()})
+    return df
     
     df = pd.DataFrame(data)
     # บังคับทุกคอลัมน์เป็น float แม้ค่าทั้งหมดจะเป็น 0
@@ -237,6 +237,7 @@ with st.sidebar:
     doc_no    = st.text_input("Document No.", key="doc_no")
     eng_name  = st.text_input("Prepared by",  key="eng_name")
     chk_name  = st.text_input("Checked by",   key="chk_name")
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. DATA EDITORS
 # ─────────────────────────────────────────────────────────────────────────────
@@ -247,33 +248,34 @@ st.caption("AASHTO LRFD | 1.0 m transverse strip | "
 c1, c2 = st.columns(2)
 with c1:
     st.subheader("📏 Flange Thickness t(x)")
-    # อ่านจาก src แล้วบังคับ float ก่อนส่งเข้า editor ทุกครั้ง
     df_thk = st.data_editor(
-        st.session_state["thk_src"].astype("float64"), 
-        num_rows="dynamic", # ไม่มี key แล้ว
+        st.session_state["thk_src"], 
+        num_rows="dynamic",
         column_config={
             "x (m)": st.column_config.NumberColumn("x (m)", format="%.2f", step=0.01),
             "t (m)": st.column_config.NumberColumn("t (m)", format="%.3f", step=0.001),
         },
+        key=None, # สำคัญ: ห้ามใส่ key
     )
-    # sync กลับเข้า src ทันที
+    # บังคับ float แล้ว sync กลับ
     st.session_state["thk_src"] = df_thk.astype("float64")
 
     st.subheader("🔩 Tendon Profile z(x) [from top face]")
     df_tdn = st.data_editor(
-        st.session_state["tdn_src"].astype("float64"),
+        st.session_state["tdn_src"],
         num_rows="dynamic",
         column_config={
             "x (m)": st.column_config.NumberColumn("x (m)", format="%.2f", step=0.01),
             "z_top (m)": st.column_config.NumberColumn("z_top (m)", format="%.3f", step=0.001),
         },
+        key=None,
     )
     st.session_state["tdn_src"] = df_tdn.astype("float64")
 
 with c2:
     st.subheader("📦 Loads per 1 m strip")
     df_ld = st.data_editor(
-        st.session_state["ld_src"].astype("float64"),
+        st.session_state["ld_src"],
         num_rows="dynamic",
         column_config={
             "x (m)": st.column_config.NumberColumn("x (m)", format="%.2f", step=0.01),
@@ -284,6 +286,7 @@ with c2:
             "M_LL (kNm/m)": st.column_config.NumberColumn("M_LL (kNm/m)", format="%.2f", step=0.01),
             "V_LL (kN/m)": st.column_config.NumberColumn("V_LL (kN/m)", format="%.2f", step=0.01),
         },
+        key=None,
     )
     st.session_state["ld_src"] = df_ld.astype("float64")
 
