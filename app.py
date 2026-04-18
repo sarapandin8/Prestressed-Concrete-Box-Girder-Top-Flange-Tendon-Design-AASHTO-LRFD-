@@ -721,19 +721,6 @@ with c1:
         st.success("✅ Thickness data updated")
         st.rerun()
 
-    st.subheader("🔩 Tendon Profile  z(x)  [from top face]")
-    df_tdn_edit = st.data_editor(
-        st.session_state["tdn_src"].astype("float64"),
-        num_rows="dynamic", 
-        key="_tmp_tdn",
-        use_container_width=True)
-    
-    if st.button("🔄  Update Tendon Data", key="btn_update_tdn", use_container_width=True, type="primary"):
-        st.session_state["tdn_src"] = df_tdn_edit.astype("float64")
-        st.success("✅ Tendon data updated")
-        st.rerun()
-
-with c2:
     st.subheader("📦 Loads per 1 m strip")
     df_ld_edit = st.data_editor(
         st.session_state["ld_src"].astype("float64"),
@@ -744,6 +731,19 @@ with c2:
     if st.button("🔄  Update Load Data", key="btn_update_ld", use_container_width=True, type="primary"):
         st.session_state["ld_src"] = df_ld_edit.astype("float64")
         st.success("✅ Load data updated")
+        st.rerun()
+
+with c2:
+    st.subheader("🔩 Tendon Profile  z(x)  [from top face]")
+    df_tdn_edit = st.data_editor(
+        st.session_state["tdn_src"].astype("float64"),
+        num_rows="dynamic", 
+        key="_tmp_tdn",
+        use_container_width=True)
+    
+    if st.button("🔄  Update Tendon Data", key="btn_update_tdn", use_container_width=True, type="primary"):
+        st.session_state["tdn_src"] = df_tdn_edit.astype("float64")
+        st.success("✅ Tendon data updated")
         st.rerun()
 
 # ตัวแปรที่ใช้ Save/Load ให้อ่านจาก source เสมอ
