@@ -65,13 +65,14 @@ for k, v in DEFAULT_SCALARS.items():
 _TABLE_SRC = {"thk_src": "df_thickness", "tdn_src": "df_tendon", "ld_src": "df_load"}
 
 def _make_float_df(data: dict) -> pd.DataFrame:
-    """Create DataFrame and force ALL columns to float64.
-    Prevents Streamlit data_editor from locking to integer-only input
-    when all default values happen to be whole numbers (0.00 -> int64 by pandas)."""
+    """บังคับ float64 ทุกคอลัมน์ และกันเคส dict ว่าง"""
+    if not data or not any(data.values()):
+        # ถ้าไม่มีข้อมูล สร้าง df ว่างแต่กำหนด dtype float ไว้ก่อน
+        return pd.DataFrame({k: pd.Series(dtype="float64") for k in data.keys()})
+    
     df = pd.DataFrame(data)
-    for col in df.columns:
-        df[col] = df[col].astype(float)
-    return df
+    # บังคับทุกคอลัมน์เป็น float แม้ค่าทั้งหมดจะเป็น 0
+    return df.astype("float64")
 
 for src_key, tbl_key in _TABLE_SRC.items():
     if src_key not in st.session_state:
@@ -239,16 +240,6 @@ with st.sidebar:
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. DATA EDITORS
 # ─────────────────────────────────────────────────────────────────────────────
-def _force_float_and_rerun():
-    """Callback: บังคับทุกตารางเป็น float แล้ว rerun เพื่อรีเซ็ต widget"""
-    for src, ed in [("thk_src", "ed_thk"), ("tdn_src", "ed_tdn"), ("ld_src", "ed_ld")]:
-        if ed in st.session_state:
-            df = st.session_state[ed]
-            for col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors="coerce").astype(float)
-            st.session_state[src] = df
-    st.rerun() # สำคัญ: สร้าง widget ใหม่ทันที
-
 st.title("🏗️ PSC Box Girder — Top Flange Transverse Design")
 st.caption("AASHTO LRFD | 1.0 m transverse strip | "
            "Compression (−) Tension (+) | +M = sagging")
@@ -256,33 +247,34 @@ st.caption("AASHTO LRFD | 1.0 m transverse strip | "
 c1, c2 = st.columns(2)
 with c1:
     st.subheader("📏 Flange Thickness t(x)")
-    # ก่อนส่งเข้า data_editor บังคับ float อีกรอบกันเหนียว
-    _df_thk = st.session_state["thk_src"].astype(float)
-    st.data_editor(
-        _df_thk, num_rows="dynamic", key="ed_thk",
+    # อ่านจาก src แล้วบังคับ float ก่อนส่งเข้า editor ทุกครั้ง
+    df_thk = st.data_editor(
+        st.session_state["thk_src"].astype("float64"), 
+        num_rows="dynamic", # ไม่มี key แล้ว
         column_config={
             "x (m)": st.column_config.NumberColumn("x (m)", format="%.2f", step=0.01),
             "t (m)": st.column_config.NumberColumn("t (m)", format="%.3f", step=0.001),
         },
-        on_change=_force_float_and_rerun, # เพิ่มบรรทัดนี้
     )
+    # sync กลับเข้า src ทันที
+    st.session_state["thk_src"] = df_thk.astype("float64")
 
     st.subheader("🔩 Tendon Profile z(x) [from top face]")
-    _df_tdn = st.session_state["tdn_src"].astype(float)
-    st.data_editor(
-        _df_tdn, num_rows="dynamic", key="ed_tdn",
+    df_tdn = st.data_editor(
+        st.session_state["tdn_src"].astype("float64"),
+        num_rows="dynamic",
         column_config={
             "x (m)": st.column_config.NumberColumn("x (m)", format="%.2f", step=0.01),
             "z_top (m)": st.column_config.NumberColumn("z_top (m)", format="%.3f", step=0.001),
         },
-        on_change=_force_float_and_rerun, # เพิ่มบรรทัดนี้
     )
+    st.session_state["tdn_src"] = df_tdn.astype("float64")
 
 with c2:
     st.subheader("📦 Loads per 1 m strip")
-    _df_ld = st.session_state["ld_src"].astype(float)
-    st.data_editor(
-        _df_ld, num_rows="dynamic", key="ed_ld",
+    df_ld = st.data_editor(
+        st.session_state["ld_src"].astype("float64"),
+        num_rows="dynamic",
         column_config={
             "x (m)": st.column_config.NumberColumn("x (m)", format="%.2f", step=0.01),
             "M_DL (kNm/m)": st.column_config.NumberColumn("M_DL (kNm/m)", format="%.2f", step=0.01),
@@ -292,13 +284,9 @@ with c2:
             "M_LL (kNm/m)": st.column_config.NumberColumn("M_LL (kNm/m)", format="%.2f", step=0.01),
             "V_LL (kN/m)": st.column_config.NumberColumn("V_LL (kN/m)", format="%.2f", step=0.01),
         },
-        on_change=_force_float_and_rerun, # เพิ่มบรรทัดนี้
     )
+    st.session_state["ld_src"] = df_ld.astype("float64")
 
-# หลัง editor ใช้ค่าจาก src ที่ถูก sync แล้วเท่านั้น
-df_thk = st.session_state["thk_src"]
-df_tdn = st.session_state["tdn_src"]
-df_ld = st.session_state["ld_src"]
 # ─────────────────────────────────────────────────────────────────────────────
 # 4.  CALCULATION ENGINE
 # ─────────────────────────────────────────────────────────────────────────────
