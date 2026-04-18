@@ -439,6 +439,10 @@ html, body, [class*="css"] {
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
+def _make_float_df(data: dict) -> pd.DataFrame:
+    """สร้าง DataFrame และบังคับทุกคอลัมน์เป็น float64 กันเคสเพิ่มแถวแล้วกลายเป็น int"""
+    df = pd.DataFrame({col: pd.Series(vals, dtype="float64") for col, vals in data.items()})
+    return df
 DEFAULT_SCALARS = dict(
     width=12.0, cl_lweb=2.0, cl_rweb=10.0,
     fc=45.0, fci=36.0, fpu=1860.0, fpy_ratio=0.90,
@@ -471,7 +475,7 @@ for k, v in DEFAULT_SCALARS.items():
 _TABLE_SRC = {"thk_src": "df_thickness", "tdn_src": "df_tendon", "ld_src": "df_load"}
 for src_key, tbl_key in _TABLE_SRC.items():
     if src_key not in st.session_state:
-        st.session_state[src_key] = pd.DataFrame(DEFAULT_TABLES[tbl_key])
+        st.session_state[src_key] = _make_float_df(DEFAULT_TABLES[tbl_key])
 
 if "_tbl_ver" not in st.session_state:
     st.session_state["_tbl_ver"] = 0
@@ -657,6 +661,10 @@ st.markdown("""
 # ─────────────────────────────────────────────────────────────────────────────
 _v = st.session_state["_tbl_ver"]
 
+def _editor_key(base: str, df: pd.DataFrame) -> str:
+    """ถ้ามีคอลัมน์ไหนเป็น int ให้เปลี่ยน key เพื่อบังคับสร้าง widget ใหม่"""
+    return base + ("_int" if "int64" in df.dtypes.values else "_float")
+
 st.markdown("""
 <div style="
     background: #ffffff;
@@ -679,22 +687,30 @@ c1, c2 = st.columns(2)
 with c1:
     st.subheader("📏 Flange Thickness  t(x)")
     df_thk = st.data_editor(
-        st.session_state["thk_src"], num_rows="dynamic", key=f"ed_thk_{_v}",
+        st.session_state["thk_src"].astype("float64"),  # ← เพิ่ม .astype("float64")
+        num_rows="dynamic", 
+        key=_editor_key("ed_thk", st.session_state["thk_src"]),  # ← เปลี่ยน key
         use_container_width=True)
+    st.session_state["thk_src"] = df_thk.astype("float64")  # ← เพิ่มบรรทัดนี้
     st.session_state["_cur_thk"] = df_thk
 
     st.subheader("🔩 Tendon Profile  z(x)  [from top face]")
     df_tdn = st.data_editor(
-        st.session_state["tdn_src"], num_rows="dynamic", key=f"ed_tdn_{_v}",
+        st.session_state["tdn_src"].astype("float64"),  # ← เพิ่ม .astype("float64")
+        num_rows="dynamic", 
+        key=_editor_key("ed_tdn", st.session_state["tdn_src"]),  # ← เปลี่ยน key
         use_container_width=True)
+    st.session_state["tdn_src"] = df_tdn.astype("float64")  # ← เพิ่มบรรทัดนี้
     st.session_state["_cur_tdn"] = df_tdn
 with c2:
     st.subheader("📦 Loads per 1 m strip")
     df_ld = st.data_editor(
-        st.session_state["ld_src"], num_rows="dynamic", key=f"ed_ld_{_v}",
+        st.session_state["ld_src"].astype("float64"),  # ← เพิ่ม .astype("float64")
+        num_rows="dynamic", 
+        key=_editor_key("ed_ld", st.session_state["ld_src"]),  # ← เปลี่ยน key
         use_container_width=True)
+    st.session_state["ld_src"] = df_ld.astype("float64")  # ← เพิ่มบรรทัดนี้
     st.session_state["_cur_ld"] = df_ld
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PRESTRESS LOSS ENGINE  (AASHTO LRFD 5.9.3)  — UNCHANGED
