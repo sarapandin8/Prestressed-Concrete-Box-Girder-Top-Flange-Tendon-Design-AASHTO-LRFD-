@@ -661,12 +661,6 @@ st.markdown("""
 # ─────────────────────────────────────────────────────────────────────────────
 _v = st.session_state["_tbl_ver"]
 
-def _sync_and_rerun():
-    """อัปเดต source ทั้ง 3 ตาราง แล้ว rerun เพื่อให้ค่าเข้าทันที"""
-    st.session_state["thk_src"] = st.session_state["_tmp_thk"].astype("float64")
-    st.session_state["tdn_src"] = st.session_state["_tmp_tdn"].astype("float64")
-    st.session_state["ld_src"] = st.session_state["_tmp_ld"].astype("float64")
-
 st.markdown("""
 <div style="
     background: #ffffff;
@@ -679,8 +673,7 @@ st.markdown("""
         📊  Input Station Tables
     </div>
     <div style="font-size:0.8rem; color:#4a6080;">
-        ระบุข้อมูล Thickness · Tendon Profile · Loads ตามตำแหน่ง x (m)
-        — แถวจะถูก sort และ interpolate อัตโนมัติ
+        แก้ข้อมูลในตารางได้หลายช่อง แล้วกดปุ่ม "Update Data" ใต้ตารางนั้นเพื่ออัปเดทผลลัพธ์
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -688,38 +681,49 @@ st.markdown("""
 c1, c2 = st.columns(2)
 with c1:
     st.subheader("📏 Flange Thickness  t(x)")
-    df_thk = st.data_editor(
+    df_thk_edit = st.data_editor(
         st.session_state["thk_src"].astype("float64"),
         num_rows="dynamic", 
         key="_tmp_thk",
         use_container_width=True)
-    # ถ้าค่าเปลี่ยน ให้ sync แล้ว rerun ทันที
-    if not df_thk.equals(st.session_state["thk_src"]):
-        st.session_state["thk_src"] = df_thk.astype("float64")
+    
+    # ปุ่ม Update ใต้ตาราง Thickness
+    if st.button("🔄  Update Thickness Data", key="btn_update_thk", use_container_width=True, type="primary"):
+        st.session_state["thk_src"] = df_thk_edit.astype("float64")
+        st.success("✅ Thickness data updated")
         st.rerun()
-    st.session_state["_cur_thk"] = df_thk
 
     st.subheader("🔩 Tendon Profile  z(x)  [from top face]")
-    df_tdn = st.data_editor(
+    df_tdn_edit = st.data_editor(
         st.session_state["tdn_src"].astype("float64"),
         num_rows="dynamic", 
         key="_tmp_tdn",
         use_container_width=True)
-    if not df_tdn.equals(st.session_state["tdn_src"]):
-        st.session_state["tdn_src"] = df_tdn.astype("float64")
+    
+    # ปุ่ม Update ใต้ตาราง Tendon
+    if st.button("🔄  Update Tendon Data", key="btn_update_tdn", use_container_width=True, type="primary"):
+        st.session_state["tdn_src"] = df_tdn_edit.astype("float64")
+        st.success("✅ Tendon data updated")
         st.rerun()
-    st.session_state["_cur_tdn"] = df_tdn
+
 with c2:
     st.subheader("📦 Loads per 1 m strip")
-    df_ld = st.data_editor(
+    df_ld_edit = st.data_editor(
         st.session_state["ld_src"].astype("float64"),
         num_rows="dynamic", 
         key="_tmp_ld",
         use_container_width=True)
-    if not df_ld.equals(st.session_state["ld_src"]):
-        st.session_state["ld_src"] = df_ld.astype("float64")
+    
+    # ปุ่ม Update ใต้ตาราง Load
+    if st.button("🔄  Update Load Data", key="btn_update_ld", use_container_width=True, type="primary"):
+        st.session_state["ld_src"] = df_ld_edit.astype("float64")
+        st.success("✅ Load data updated")
         st.rerun()
-    st.session_state["_cur_ld"] = df_ld
+
+# ตัวแปรที่ใช้คำนวณ ให้อ่านจาก source เสมอ
+st.session_state["_cur_thk"] = st.session_state["thk_src"]
+st.session_state["_cur_tdn"] = st.session_state["tdn_src"]
+st.session_state["_cur_ld"] = st.session_state["ld_src"]
 # ─────────────────────────────────────────────────────────────────────────────
 # PRESTRESS LOSS ENGINE  (AASHTO LRFD 5.9.3)  — UNCHANGED
 # ─────────────────────────────────────────────────────────────────────────────
