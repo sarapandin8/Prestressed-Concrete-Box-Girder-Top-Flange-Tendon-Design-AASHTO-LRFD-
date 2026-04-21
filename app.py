@@ -612,7 +612,7 @@ with st.sidebar:
         rh_val   = st.number_input("Relative Humidity  RH (%)", min_value=30, max_value=100, key="RH")
         anch_val = st.number_input("Anchorage Slip  Δ (mm)", value=6.0, min_value=0.0,
                                    key="anch_slip_mm")
-        st.caption("Constants: μ=0.20, K=0.0066 rad/m, Ep=197,000 MPa")
+        st.caption("Constants: μ=0.20, K=0.00066 rad/m, Ep=197,000 MPa")
 
     # ── Resistance Factors ───────────────────────────────────────────────────
     with st.expander("⚖️  Resistance Factors φ"):
@@ -763,10 +763,10 @@ def calc_losses(dft, dfp, fc, fci, fpu, fpi_ratio, fpy_ratio, aps_strand,
                 t0, RH, anch_slip_mm, width):
     Ep    = 197_000.0
     mu    = 0.20
-    # K wobble: 0.0066 rad/m ≈ 0.002 rad/ft (corrugated/plastic flat duct for slab tendons)
+    # K wobble: 0.00066 rad/m ≈ 0.0002 rad/ft (corrugated/plastic flat duct for slab tendons)
     # AASHTO Table 5.9.2.2.2b-1 range: 0.0002–0.0010 rad/ft (rigid/flexible metal duct)
     # Verify against actual duct product data before use.
-    K_wob = 0.0066
+    K_wob = 0.00066
     KL    = 40.0          # AASHTO 5.9.3.4.3a: KL=40 for low-relax (was 45, corrected)
     b     = 1.0
     wc    = 2400.0
@@ -1226,10 +1226,10 @@ try:
         h2("3.4  Immediate Losses")
 
         h3("3.4.1  Friction Loss  ΔfpF  (AASHTO 5.9.3.2.1)")
-        para("Parameters: μ = 0.20, K = 0.0066 rad/m  (7-wire low-relax, internal grouted)",
+        para("Parameters: μ = 0.20, K = 0.00066 rad/m  (7-wire low-relax, internal grouted)",
              italic=True, indent=0.3)
         formula("ΔfpF  =  fpj × (1 − e^(−μα − Kx))")
-        subst( f"      =  {_fpj:.2f} × (1 − e^(−{0.20:.2f}×{_L['alpha']:.4f} − {0.0066:.4f}×{_L['L_ten']/2:.3f}))")
+        subst( f"      =  {_fpj:.2f} × (1 − e^(−{0.20:.2f}×{_L['alpha']:.4f} − {0.00066:.4f}×{_L['L_ten']/2:.3f}))")
         result(f"ΔfpF  =  {_L['delta_fpF']:.4f} MPa  ({_L['delta_fpF']/_fpj*100:.2f}% of fpj)")
         blank()
 
@@ -1237,7 +1237,7 @@ try:
         anch_s = float(st.session_state.get("anch_slip_mm", 6.0))
         formula("Length affected by anchor set:")
         formula("  Lpa  =  √[ Δ·Ep / (μ·fpj/L + K) / 1000 ]")
-        subst( f"       =  √[ {anch_s:.1f}mm×197000 / ({0.20:.2f}×{_fpj:.2f}/{_L['L_ten']:.3f}+{0.0066:.4f}) / 1000 ]")
+        subst( f"       =  √[ {anch_s:.1f}mm×197000 / ({0.20:.2f}×{_fpj:.2f}/{_L['L_ten']:.3f}+{0.00066:.4f}) / 1000 ]")
         result(f"  Lpa  =  {_L['Lpa']:.4f} m")
         blank()
         formula("ΔfpA  =  Δ × Ep / Lpa")
@@ -1897,7 +1897,7 @@ try:
                 "ΔfpF + ΔfpA + ΔfpES",
             ],
             "Key Params": [
-                f"μ={0.20}, K={0.0066}, α={_L['alpha']:.4f}rad",
+                f"μ={0.20}, K={0.00066}, α={_L['alpha']:.4f}rad",
                 f"Δ={st.session_state.get('anch_slip_mm',6):.0f}mm, Lpa={_L['Lpa']:.2f}m",
                 f"fcgp={_L['fcgp']:.3f}MPa, Eci={_L['Eci']:.0f}MPa",
                 "",
@@ -1996,7 +1996,7 @@ try:
                 f"{_L['Eci']:.0f} MPa",
                 "197,000 MPa",
                 "0.20  [-]",
-                "0.0066 rad/m  (verify vs product data)",
+                "0.00066 rad/m  (verify vs product data)",
                 f"{_L['alpha']:.4f} rad",
                 f"{_L['L_ten']:.3f} m",
                 f"{_L['friction_slope']:.4f} MPa/m",
