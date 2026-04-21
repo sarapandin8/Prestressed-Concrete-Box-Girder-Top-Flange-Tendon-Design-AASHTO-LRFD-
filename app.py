@@ -685,23 +685,26 @@ div[data-testid="stButton"] > button[kind="primary"]:focus {
     box-shadow: 0 0 0 0.2rem rgba(13, 31, 60, 0.4) !important;
     outline: none !important;
 }
-    /* เปลี่ยนสีปุ่ม Export Main area เป็นฟ้าอ่อน */
-    button[data-testid*="main_export"] {
-        background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)!important;
-        background-color: #e0f2fe!important;
-        border: 1px solid #7dd3fc!important;
-        color: #0c4a6e!important;
-    }
-    
-    button[data-testid*="main_export"]:hover {
-        background: linear-gradient(135deg, #bae6fd 0%, #7dd3fc 100%)!important;
-        border-color: #38bdf8!important;
-    }
-    
-    button[data-testid*="main_export"] * {
-        background: transparent!important;
-        color: #0c4a6e!important;
-    }
+/* ปุ่ม Export Main area สีส้ม → ฟ้าอ่อน */
+div[data-testid="stAppViewContainer"] [data-testid="stDownloadButton"] button[kind="primary"] {
+    background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)!important;
+    background-color: #e0f2fe!important;
+    background-image: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)!important;
+    color: #0c4a6e!important;
+    border: 1px solid #7dd3fc!important;
+}
+
+div[data-testid="stAppViewContainer"] [data-testid="stDownloadButton"] button[kind="primary"]:hover {
+    background: linear-gradient(135deg, #bae6fd 0%, #7dd3fc 100%)!important;
+    background-color: #bae6fd!important;
+    border-color: #38bdf8!important;
+}
+
+div[data-testid="stAppViewContainer"] [data-testid="stDownloadButton"] button[kind="primary"] * {
+    background: transparent!important;
+    background-color: transparent!important;
+    color: #0c4a6e!important;
+}
 
 </style>
 """, unsafe_allow_html=True)
@@ -1741,7 +1744,7 @@ try:
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 use_container_width=True,
                 type="primary",
-                                key="main_export",
+                                
             )
 
         # ── Sidebar export button ──────────────────────────────────────
