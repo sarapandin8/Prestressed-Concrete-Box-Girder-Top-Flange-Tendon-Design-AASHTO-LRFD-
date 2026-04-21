@@ -512,9 +512,10 @@ with st.sidebar:
 
     # ── 💾 SAVE / 📂 OPEN ────────────────────────────────────────────────────
     with st.expander("💾  Save  /  📂  Open Project", expanded=True):
-        def _tbl_to_dict(cur_key, src_key):
-            df = st.session_state.get(cur_key,
-                 st.session_state.get(src_key, pd.DataFrame()))
+        def _tbl_to_dict(src_key):
+            """อ่านจาก *_src โดยตรงเสมอ (ไม่ใช้ _cur_* เพราะ st.rerun() ทำให้ _cur_* ล้าหลัง 1 render)
+            ใช้ .copy() ป้องกันการแก้ไข DataFrame ใน session_state โดยไม่ตั้งใจ"""
+            df = st.session_state.get(src_key, pd.DataFrame()).copy()
             if not isinstance(df, pd.DataFrame):
                 try:    df = pd.DataFrame(df)
                 except: return {}
@@ -526,9 +527,9 @@ with st.sidebar:
         _save_data = {
             "scalars": {k: st.session_state[k] for k in DEFAULT_SCALARS},
             "tables": {
-                "df_thickness": _tbl_to_dict("_cur_thk", "thk_src"),
-                "df_tendon":    _tbl_to_dict("_cur_tdn", "tdn_src"),
-                "df_load":      _tbl_to_dict("_cur_ld",  "ld_src"),
+                "df_thickness": _tbl_to_dict("thk_src"),
+                "df_tendon":    _tbl_to_dict("tdn_src"),
+                "df_load":      _tbl_to_dict("ld_src"),
             },
         }
         _json_bytes = json.dumps(_save_data, indent=2, ensure_ascii=False).encode("utf-8")
@@ -568,8 +569,6 @@ with st.sidebar:
                                 ndf[col] = pd.to_numeric(ndf[col], errors="coerce")
                             st.session_state[src_key] = ndf.dropna(how="all")
                     st.session_state["_tbl_ver"] += 1
-                    for k in ["_cur_thk", "_cur_tdn", "_cur_ld"]:
-                        st.session_state.pop(k, None)
                     st.session_state["_loaded_hash"] = _fhash
                     st.success("✅  Project loaded successfully!")
                     st.rerun()
@@ -713,7 +712,7 @@ with c1:
     df_thk_edit = st.data_editor(
         st.session_state["thk_src"].astype("float64"),
         num_rows="dynamic", 
-        key="_tmp_thk",
+        key=f"_tmp_thk_{_v}",
         use_container_width=True)
     
     if st.button("🔄  Update Thickness Data", key="btn_update_thk", use_container_width=True, type="primary"):
@@ -726,7 +725,7 @@ with c2:
     df_tdn_edit = st.data_editor(
         st.session_state["tdn_src"].astype("float64"),
         num_rows="dynamic", 
-        key="_tmp_tdn",
+        key=f"_tmp_tdn_{_v}",
         use_container_width=True)
     
     if st.button("🔄  Update Tendon Data", key="btn_update_tdn", use_container_width=True, type="primary"):
@@ -741,9 +740,9 @@ st.subheader("📦 Loads per 1 m strip")
 df_ld_edit = st.data_editor(
     st.session_state["ld_src"].astype("float64"),
     num_rows="dynamic", 
-    key="_tmp_ld",
+    key=f"_tmp_ld_{_v}",
     use_container_width=True,
-    height=350  # เพิ่มความสูงให้เห็นหลายแถวพร้อมกัน
+    height=350
 )
 
 if st.button("🔄  Update Load Data", key="btn_update_ld", use_container_width=True, type="primary"):
@@ -751,15 +750,10 @@ if st.button("🔄  Update Load Data", key="btn_update_ld", use_container_width=
     st.success("✅ Load data updated")
     st.rerun()
 
-# ตัวแปรที่ใช้ Save/Load ให้อ่านจาก source เสมอ
-st.session_state["_cur_thk"] = st.session_state["thk_src"]
-st.session_state["_cur_tdn"] = st.session_state["tdn_src"]
-st.session_state["_cur_ld"] = st.session_state["ld_src"]
-
-# ตัวแปรที่ใช้คำนวณ ให้โค้ดส่วน calc_losses มองเห็น
+# ตัวแปรที่ใช้คำนวณ
 df_thk = st.session_state["thk_src"]
 df_tdn = st.session_state["tdn_src"]
-df_ld = st.session_state["ld_src"]
+df_ld  = st.session_state["ld_src"]
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PRESTRESS LOSS ENGINE  (AASHTO LRFD 5.9.3)  — UNCHANGED
