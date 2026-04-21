@@ -764,13 +764,16 @@ df_ld = st.session_state["ld_src"]
 # ─────────────────────────────────────────────────────────────────────────────
 # PRESTRESS LOSS ENGINE  (AASHTO LRFD 5.9.3)  — UNCHANGED
 # ─────────────────────────────────────────────────────────────────────────────
-def calc_losses(dft, dfp, fc, fci, fpu, fpi_ratio, aps_strand,
+def calc_losses(dft, dfp, fc, fci, fpu, fpi_ratio, fpy_ratio, aps_strand,
                 num_tendon, n_strands, duct_dia_mm,
                 t0, RH, anch_slip_mm, width):
     Ep    = 197_000.0
     mu    = 0.20
+    # K wobble: 0.0066 rad/m ≈ 0.002 rad/ft (corrugated/plastic flat duct for slab tendons)
+    # AASHTO Table 5.9.2.2.2b-1 range: 0.0002–0.0010 rad/ft (rigid/flexible metal duct)
+    # Verify against actual duct product data before use.
     K_wob = 0.0066
-    KL    = 45.0
+    KL    = 40.0          # AASHTO 5.9.3.4.3a: KL=40 for low-relax (was 45, corrected)
     b     = 1.0
     wc    = 2400.0
 
@@ -842,15 +845,22 @@ def calc_losses(dft, dfp, fc, fci, fpu, fpi_ratio, aps_strand,
     ktd = 1.0
 
     eps_bdf  = kvs * khs * kf * ktd * 0.48e-3
-    delta_fpSH = eps_bdf * Ep
 
     ti_safe = max(float(t0), 1.0)
     psi_b   = 1.9 * kvs * khc * kf * ktd * (ti_safe ** -0.118)
 
-    fcgp_lt = (Pi_final/An_mid + Pi_final*e_mid**2/In_mid) / 1000.0
-    delta_fpCR = max((Ep / Ec) * fcgp_lt * psi_b, 0.0)
+    # Kid: transformed-section coefficient — AASHTO 5.9.3.4.3-1 / C5.9.3.4.2-2
+    Kid = 1.0 / (1.0 + (Ep / Eci) * (Aps / Ag_mid)
+                      * (1.0 + Ag_mid * e_mid**2 / Ig_mid)
+                      * (1.0 + 0.7 * psi_b))
+    delta_fpSH = eps_bdf * Ep * Kid          # AASHTO 5.9.3.4.3-1 (was missing Kid)
 
-    fpy = fpu * fpi_ratio / fpi_ratio * 0.9
+    fcgp_lt = (Pi_final/An_mid + Pi_final*e_mid**2/In_mid) / 1000.0
+    # AASHTO 5.9.3.4.2-1: first term uses Eci (was Ec — corrected)
+    # Second term (Δfcd effect) is conservatively omitted → result ≥ 0
+    delta_fpCR = max((Ep / Eci) * fcgp_lt * psi_b, 0.0)
+
+    fpy = fpu * fpy_ratio     # AASHTO 5.4.4.1: low-relax=0.90, stress-relieved=0.85
     fpt_r = fpi_eff - 0.3 * (delta_fpSH + delta_fpCR)
     fpt_r = max(fpt_r, 0.5 * fpu)
     delta_fpR = max((fpt_r / KL) * (fpt_r / fpy - 0.55), 0.0)
@@ -874,9 +884,9 @@ def calc_losses(dft, dfp, fc, fci, fpu, fpi_ratio, aps_strand,
         delta_imm=delta_imm, imm_loss_pct=imm_loss_pct,
         fcgp=fcgp, fpt_mid=fpt_mid, Pi=Pi_final,
         fci_ksi=fci_ksi, kvs=kvs, khs=khs, khc=khc, kf=kf, ktd=ktd,
-        psi_b=psi_b, eps_bdf=eps_bdf,
+        Kid=Kid, psi_b=psi_b, eps_bdf=eps_bdf,
         fcgp_lt=fcgp_lt, delta_fpSH=delta_fpSH,
-        delta_fpCR=delta_fpCR, delta_fpR=delta_fpR,
+        delta_fpCR=delta_fpCR, delta_fpR=delta_fpR, fpt_r=fpt_r,
         delta_lt=delta_lt, lt_loss_pct=lt_loss_pct,
         fpi_eff=fpi_eff, fpe=fpe_val, Pe=Pe_final,
         eff_ratio=Pe_final / Pj if Pj > 0 else 0.75,
@@ -1010,7 +1020,7 @@ try:
     rh_v   = int(st.session_state.get("RH", 75))
     anch_v = float(st.session_state.get("anch_slip_mm", 6.0))
     L = calc_losses(dft, dfp,
-                    fc, fci, fpu, fpi_ratio, aps_strand,
+                    fc, fci, fpu, fpi_ratio, fpy_ratio, aps_strand,
                     num_tendon, n_strands, duct_dia_mm,
                     t0_v, rh_v, anch_v, width)
     R = run_calc(dft, dfp, dfl, L)
@@ -1157,7 +1167,7 @@ try:
         h2("2.4  Allowable Stress Limits")
         tbl(["Condition","Expression","Limit (MPa)","Article"],[
             ["Transfer — Compression",         "−0.60·f'ci", f"{R['lim_tr_c']:.3f}","5.9.2.3.1a"],
-            ["Transfer — Tension (bonded)",    "+0.62·√f'ci",f"+{R['lim_tr_t']:.4f}","5.9.2.3.1b"],
+            ["Transfer — Tension (bonded)",    "+0.25·√f'ci (SI)",f"+{R['lim_tr_t']:.4f}","5.9.2.3.1b"],
             ["Service I — Comp (perm.loads)",  "−0.45·f'c",  f"{R['lim_sv_cp']:.3f}","5.9.2.3.2a"],
             ["Service I — Comp (total loads)", "−0.60·f'c",  f"{R['lim_sv_ct']:.3f}","5.9.2.3.2a"],
             ["Service I — Tension (bonded)",   "+0.50·√f'c", f"+{R['lim_sv_t']:.4f}","5.9.2.3.2b"],
@@ -1267,7 +1277,7 @@ try:
         result(f"Pi  =  {_L['Pi']:.4f} kN/m")
         blank()
 
-        h2("3.5  Long-Term Losses  (Approximate Method, AASHTO 5.9.3.3)")
+        h2("3.5  Long-Term Losses  (Refined Method, AASHTO 5.9.3.4)")
         para(f"t₀ = {t0_v} days  |  RH = {rh_v}%  |  V/S = {_L['VS_mm']:.1f} mm",
              italic=True, indent=0.3)
         blank()
@@ -1285,8 +1295,8 @@ try:
         subst( f"     =  1.56 − 0.008×{rh_v}")
         result(f"khc  =  {_L['khc']:.4f}")
         blank()
-        formula("kf   =  5.0 / (1 + f'ci)")
-        subst( f"     =  5.0 / (1 + {fci:.1f})")
+        formula("kf   =  5.0 / (1 + f'ci_ksi)   [AASHTO 5.4.2.3.2 — f'ci must be in ksi]")
+        subst( f"     =  5.0 / (1 + {_L['fci_ksi']:.3f} ksi)   (f'ci = {fci:.1f} MPa ÷ 6.895)")
         result(f"kf   =  {_L['kf']:.4f}")
         blank()
         formula("γh  (humidity factor for creep/shrinkage) = 1.7 − 0.01·RH")
@@ -1301,21 +1311,29 @@ try:
         result(f"ψb  =  {_L['psi_b']:.4f}")
         blank()
 
-        h3("3.5.2  Creep Loss  ΔfpCR  (AASHTO 5.9.3.3-1)")
-        formula("ΔfpCR  =  10.0 × (fpi·Aps/Ag) × γh × γst")
-        subst( f"       =  ({197000:.0f}/{_L['Ec']:.0f}) × {_L['fcgp_lt']:.4f} × {_L['psi_b']:.4f}")
+        h3("3.5.2  Creep Loss  ΔfpCR  (AASHTO 5.9.3.4.2-1)")
+        formula("ΔfpCR  =  (Ep / Eci) × fcgp × ψb(tf,ti)   [Refined; second term conservatively omitted]")
+        subst( f"       =  ({197000:.0f} / {_L['Eci']:.0f}) × {_L['fcgp_lt']:.4f} × {_L['psi_b']:.4f}")
         result(f"ΔfpCR  =  {_L['delta_fpCR']:.4f} MPa")
         blank()
 
-        h3("3.5.3  Shrinkage Loss  ΔfpSH  (AASHTO 5.9.3.3-1)")
-        formula("ΔfpSH  =  83 × γh × γst")
-        subst( f"       =  {_L['eps_bdf']:.6f} × {197000:.0f}")
+        h3("3.5.3  Shrinkage Loss  ΔfpSH  (AASHTO 5.9.3.4.3-1)")
+        formula("ΔfpSH  =  εbdf × Ep × Kid   [Refined; εbdf = kvs·khs·kf·ktd·0.48×10⁻³]")
+        formula("Kid    =  1 / [1 + (Ep/Eci)·(Aps/Ag)·(1 + Ag·e²/Ig)·(1 + 0.7·ψb)]")
+        subst( f"       =  1 / [1 + ({197000:.0f}/{_L['Eci']:.0f})·({_L['Aps']*1e6:.4f}/{_L['Ag_mid']*1e6:.4f})·(1 + {_L['Ag_mid']*1e6:.4f}·{_L['e_mid']*1000:.4f}²/{_L['Ig_mid']*1e12:.4f})·(1 + 0.7×{_L['psi_b']:.4f})]")
+        result(f"Kid    =  {_L['Kid']:.4f}")
+        blank()
+        subst( f"ΔfpSH  =  {_L['eps_bdf']:.6f} × {197000:.0f} × {_L['Kid']:.4f}")
         result(f"ΔfpSH  =  {_L['delta_fpSH']:.4f} MPa")
         blank()
 
-        h3("3.5.4  Relaxation Loss  ΔfpR  (AASHTO 5.9.3.4.3, low-relax)")
-        formula("ΔfpR   =  0.3 × [20.0 − 0.4·ΔfpES − 0.2·(ΔfpCR + ΔfpSH)]")
-        subst( f"       =  0.3 × [20.0 − 0.4×{_L['delta_fpES']:.4f} − 0.2×({_L['delta_fpCR']:.4f}+{_L['delta_fpSH']:.4f})]")
+        h3("3.5.4  Relaxation Loss  ΔfpR  (AASHTO 5.9.3.4.3a, low-relax)")
+        formula("ΔfpR   =  (fpt / KL) × (fpt/fpy − 0.55)   [KL = 40, low-relax; time factor conservatively set = 1]")
+        formula("fpt    =  fpi − 0.3·(ΔfpSH + ΔfpCR)   (steel stress adjusted for shrinkage/creep)")
+        subst( f"       =  {_L['fpi_eff']:.4f} − 0.3×({_L['delta_fpSH']:.4f} + {_L['delta_fpCR']:.4f})")
+        result(f"fpt    =  {_L['fpt_r']:.4f} MPa")
+        blank()
+        subst( f"ΔfpR   =  ({_L['fpt_r']:.4f} / 40.0) × ({_L['fpt_r']:.4f}/{fpu*0.9:.2f} − 0.55)")
         result(f"ΔfpR   =  {_L['delta_fpR']:.4f} MPa")
         blank()
 
@@ -1910,26 +1928,26 @@ try:
         col_y.metric("Pi (per 1m strip)",        f"{_L['Pi']:.2f} kN/m")
 
         st.markdown("---")
-        st.markdown("#### Long-Term Losses  (Approximate Method)")
+        st.markdown("#### Long-Term Losses  (Refined Method, AASHTO 5.9.3.4)")
         _d2 = {
             "Loss Component": [
                 "4. Shrinkage  ΔfpSH",
                 "5. Creep  ΔfpCR",
-                "6. Relaxation  ΔfpR2",
+                "6. Relaxation  ΔfpR",
                 "Total Long-term  ΔfLT",
                 "TOTAL LOSS  Δftotal",
             ],
             "Formula  [AASHTO Ref.]": [
-                "εbdf × Ep  [5.9.3.4.2a]",
-                "(Ep/Ec) × fcgp × ψb  [5.9.3.4.2b]",
-                "(fpt/KL)(fpt/fpy − 0.55)  [5.9.3.4.3c]",
+                "εbdf × Ep × Kid  [5.9.3.4.3-1]",
+                "(Ep/Eci) × fcgp × ψb  [5.9.3.4.2-1]",
+                "(fpt/KL)(fpt/fpy − 0.55)  [5.9.3.4.3a]",
                 "ΔfpSH + ΔfpCR + ΔfpR",
                 "Δfi + ΔfLT",
             ],
             "Key Params": [
-                f"εbdf={_L['eps_bdf']:.5f}, kvs={_L['kvs']:.3f}, khs={_L['khs']:.3f}, kf={_L['kf']:.3f}",
-                f"ψb={_L['psi_b']:.3f}, fcgp={_L['fcgp_lt']:.3f}MPa, khc={_L['khc']:.3f}",
-                f"KL={45}, fpt/fpy={_L['fpi_eff']/(_fpj*0.9):.3f}",
+                f"εbdf={_L['eps_bdf']:.5f}, Kid={_L['Kid']:.4f}, kvs={_L['kvs']:.3f}, khs={_L['khs']:.3f}, kf={_L['kf']:.3f}",
+                f"ψb={_L['psi_b']:.3f}, fcgp={_L['fcgp_lt']:.3f}MPa, Eci={_L['Eci']:.0f}MPa",
+                f"KL=40, fpt={_L['fpt_r']:.1f}MPa, fpt/fpy={_L['fpt_r']/(_fpj*0.9):.3f}",
                 "", "",
             ],
             "Loss (MPa)": [
@@ -1977,13 +1995,14 @@ try:
                 "kf  (concrete strength factor, uses f'ci in ksi)",
                 "ψb  (creep coefficient)",
                 "εbdf  (shrinkage strain)",
+                "Kid  (transformed section coeff. for shrinkage — AASHTO 5.9.3.4.3-1)",
             ],
             "Value  [Unit]": [
                 f"{_L['Ec']:.0f} MPa",
                 f"{_L['Eci']:.0f} MPa",
                 "197,000 MPa",
                 "0.20  [-]",
-                "0.0066 rad/m",
+                "0.0066 rad/m  (verify vs product data)",
                 f"{_L['alpha']:.4f} rad",
                 f"{_L['L_ten']:.3f} m",
                 f"{_L['friction_slope']:.4f} MPa/m",
@@ -1996,6 +2015,7 @@ try:
                 f"{_L['kf']:.4f}  (f'ci_ksi = {_L['fci_ksi']:.3f} ksi)",
                 f"{_L['psi_b']:.4f}",
                 f"{_L['eps_bdf']:.6f}",
+                f"{_L['Kid']:.4f}",
             ],
         }
         st.dataframe(pd.DataFrame(_factors), use_container_width=True)
@@ -2010,7 +2030,7 @@ try:
         fig2.add_hline(y=R["lim_tr_c"], line_dash="dash", line_color="orange",
                        annotation_text=f"−0.60f'ci = {R['lim_tr_c']:.2f} MPa")
         fig2.add_hline(y=R["lim_tr_t"], line_dash="dash", line_color="green",
-                       annotation_text=f"+0.62√f'ci = +{R['lim_tr_t']:.3f} MPa")
+                       annotation_text=f"+0.25√f'ci = +{R['lim_tr_t']:.3f} MPa  [AASHTO 5.9.2.3.1b SI]")
         fig2.update_layout(height=380, xaxis_title="x (m)", yaxis_title="Stress (MPa)")
         st.plotly_chart(fig2, use_container_width=True)
         rows_tr = [{"x (m)": f"{R['x'][i]:.2f}",
