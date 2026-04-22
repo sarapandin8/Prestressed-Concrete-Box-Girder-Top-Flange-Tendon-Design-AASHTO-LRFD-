@@ -730,46 +730,49 @@ st.markdown("""
 c1, c2 = st.columns(2)
 with c1:
     st.subheader("📏 Flange Thickness  t(x)")
-    df_thk_edit = st.data_editor(
-        st.session_state["thk_src"].astype("float64"),
-        num_rows="dynamic", 
-        key=f"_tmp_thk_{_v}",
-        use_container_width=True)
-    
-    if st.button("🔄  Update Thickness Data", key="btn_update_thk", use_container_width=True, type="primary"):
-        st.session_state["thk_src"] = df_thk_edit.astype("float64")
-        st.success("✅ Thickness data updated")
-        st.rerun()
+    with st.form(key=f"form_thk_{_v}", clear_on_submit=False):
+        df_thk_edit = st.data_editor(
+            st.session_state["thk_src"].astype("float64"),
+            num_rows="dynamic", 
+            use_container_width=True)
+        
+        submitted = st.form_submit_button("🔄  Update Thickness Data", use_container_width=True, type="primary")
+        if submitted:
+            st.session_state["thk_src"] = df_thk_edit.astype("float64")
+            st.success("✅ Thickness data updated")
+            st.rerun()
 
 with c2:
     st.subheader("🔩 Tendon Profile  z(x)  [from top face]")
-    df_tdn_edit = st.data_editor(
-        st.session_state["tdn_src"].astype("float64"),
-        num_rows="dynamic", 
-        key=f"_tmp_tdn_{_v}",
-        use_container_width=True)
-    
-    if st.button("🔄  Update Tendon Data", key="btn_update_tdn", use_container_width=True, type="primary"):
-        st.session_state["tdn_src"] = df_tdn_edit.astype("float64")
-        st.success("✅ Tendon data updated")
-        st.rerun()
+    with st.form(key=f"form_tdn_{_v}", clear_on_submit=False):
+        df_tdn_edit = st.data_editor(
+            st.session_state["tdn_src"].astype("float64"),
+            num_rows="dynamic", 
+            use_container_width=True)
+        
+        submitted = st.form_submit_button("🔄  Update Tendon Data", use_container_width=True, type="primary")
+        if submitted:
+            st.session_state["tdn_src"] = df_tdn_edit.astype("float64")
+            st.success("✅ Tendon data updated")
+            st.rerun()
 
 st.divider()
 
 # แถวล่าง: Loads กว้างเต็มจอ
 st.subheader("📦 Loads per 1 m strip")
-df_ld_edit = st.data_editor(
-    st.session_state["ld_src"].astype("float64"),
-    num_rows="dynamic", 
-    key=f"_tmp_ld_{_v}",
-    use_container_width=True,
-    height=350
-)
-
-if st.button("🔄  Update Load Data", key="btn_update_ld", use_container_width=True, type="primary"):
-    st.session_state["ld_src"] = df_ld_edit.astype("float64")
-    st.success("✅ Load data updated")
-    st.rerun()
+with st.form(key=f"form_ld_{_v}", clear_on_submit=False):
+    df_ld_edit = st.data_editor(
+        st.session_state["ld_src"].astype("float64"),
+        num_rows="dynamic", 
+        use_container_width=True,
+        height=350
+    )
+    
+    submitted = st.form_submit_button("🔄  Update Load Data", use_container_width=True, type="primary")
+    if submitted:
+        st.session_state["ld_src"] = df_ld_edit.astype("float64")
+        st.success("✅ Load data updated")
+        st.rerun()
 
 # ตัวแปรที่ใช้คำนวณ
 df_thk = st.session_state["thk_src"]
