@@ -1,7 +1,7 @@
-streamlit>=1.20.0
+streamlit
 pillow
-plotly>=5.10.0
-pandas>=1.5.0
-numpy>=1.23.0
-python-docx>=0.8.11
-kaleido==0.2.1
+plotly
+pandas
+numpy
+python-docx
+kaleido
